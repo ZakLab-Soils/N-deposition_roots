@@ -5,7 +5,7 @@
 
 
 
-##### Submitted to ***Ecology*** as an Article
+##### Submitted to ***Global Change Biology*** as an Article
 
 ***************
 
