@@ -15,7 +15,7 @@ This repository is associated with the manuscript ***"Anthropogenic N deposition
 Information about this repository
 
 ##### **Sequencing Data**
-Sequencing was done at the University of Michigan Sequencing Core using a PacBio-RS II system. FASTQ files were submitted to the NCBI Sequence Read Archive under BioProject [***](http://www.ncbi.nlm.nih.gov/bioproject/***) with SRA accession numbers [***](https://www.ncbi.nlm.nih.gov/sra/***[accn]).
+Sequencing was done at the University of Michigan Sequencing Core using a PacBio-RS II system. FASTQ files were submitted to the NCBI Sequence Read Archive under SRA accession numbers [SRR8591550](https://www.ncbi.nlm.nih.gov/sra/SRR8591550[accn]) and [SRR8591551](https://www.ncbi.nlm.nih.gov/sra/SRR8591551[accn]).
 
 ##### **Directories:**
 1. **MOTHUR:** contains all files necessary to run **MOTHUR**, including the batch files, oligos files and taxa related files. 
