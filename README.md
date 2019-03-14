@@ -9,7 +9,7 @@
 
 ***************
 
-This repository is associated with the manuscript ***"Anthropogenic N deposition slows fine root decay by altering the composition of fungal and bacterial communities"*** written by William A. Argiroff, Donald R. Zak, Rima A. Upchurch, Sydney O. Salley and A. Stuart Grandy.
+This repository is associated with the manuscript ***"Anthropogenic N deposition alters microbial communities on decaying fine roots and soil organic matter biochemistry"*** written by William A. Argiroff, Donald R. Zak, Rima A. Upchurch, Sydney O. Salley and A. Stuart Grandy.
 
 ***************
 Information about this repository
