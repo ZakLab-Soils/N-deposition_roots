@@ -1,0 +1,3480 @@
+---
+title: Anthropogenic N deposition alters microbial communities on decaying fine roots and soil organic matter biochemistry
+author: "William A. Argiroff"
+date: "February 4, 2019"
+output:
+  html_document:
+    self_contained: yes
+    toc: yes
+    toc_depth: 4
+    toc_float: yes
+  html_notebook:
+    self_contained: yes
+    toc: yes
+    toc_depth: 4
+    toc_float: yes
+---
+
+# I. About  
+
+This document contains all analyses that accompany the manuscript, "*Anthropogenic N deposition alters microbial communities on decaying fine roots and soil organic matter biochemistry*," by W. A. Argiroff, D. R. Zak, R. A. Upchurch, S. O. Salley, and A. S. Grandy.  
+
+```{r set_global_knitr_options, echo = FALSE}
+# Set global knitr options
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE, fig.align = "center")
+
+# Set seed
+set.seed(12345)
+```
+
+All package and version information used in the analyses for this study is described below. For analyses not run using `R`, the files containing corresponding code are listed and described in this document.  
+
+```{r set_working_env_load_packages, results = "hide", echo = FALSE}
+# Set working directory
+knitr::opts_knit$set(root.dir = normalizePath("~/Desktop/Ecology_roots_ndep_analyses"))
+
+# Make a list of required packages
+required.packages <- c("knitr", "tidyverse", "data.table", "vegan", "grid", "gridExtra", "ggpubr", "ggrepel", "agricolae", "seqinr")
+
+# Install packages
+installed.packages <- lapply(required.packages, library, character.only = TRUE)
+```
+
+```{r session_information, echo = FALSE}
+# Display session information
+sessionInfo()
+```
+
+# II. Soil organic matter biochemistry 
+
+## A. Summary and ANOVA  
+
+```{r sum_biochem_sources_anova}
+# Calculate totals by source, undecomposed roots
+pyr.gcms.rootp.source.tbl <- dplyr::as_tibble(data.table::fread("pyr.gcms.data.txt", sep = "\t", header = TRUE)) %>% 
+  # Rename columns
+  dplyr::rename(COMPOUND_ID = Compound_ID, 
+                COMPOUND = Compound, 
+                TYPE = Type, 
+                SOURCE = Source) %>% 
+  # Convert to long format
+  tidyr::gather(SAMPLE.NAME, PROPORTION, -c(COMPOUND_ID, COMPOUND, TYPE, SOURCE)) %>% 
+  # Add sample information
+  dplyr::inner_join(as_tibble(fread("pyr.gc.sample.info.txt", sep = "\t", header = TRUE)), ., by = "SAMPLE.NAME") %>% 
+  # Calculate percentages
+  dplyr::mutate(PERCENTAGE = 100 * PROPORTION) %>% 
+  # Fix source names
+  dplyr::mutate(SOURCE = ifelse(SOURCE == "Lignin+TMAH", "Lignin", SOURCE), 
+                SOURCE = ifelse(SOURCE == "Phenol+TMAH", "Phenol", SOURCE), 
+                SOURCE = ifelse(SOURCE == "Unknown Origin", "Unknown", SOURCE)) %>% 
+  # Group table
+  dplyr::group_by(GROUP, SAMPLE.NAME, PLOT, SITE, TREATMENT, SUBSTRATE, SOURCE) %>% 
+  # Calculate totals
+  dplyr::summarise(PERCENTAGE = sum(PERCENTAGE)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Filter
+  dplyr::filter(SUBSTRATE == "root.p") %>% 
+  # Wide format
+  tidyr::spread(SOURCE, PERCENTAGE) %>% 
+  # Select relevant columns
+  dplyr::select(-GROUP, -SAMPLE.NAME, -SUBSTRATE) %>% 
+  # Sort
+  dplyr::arrange(PLOT)
+
+# Calculate totals by source, decomposed roots
+pyr.gcms.root.source.tbl <- dplyr::as_tibble(data.table::fread("pyr.gcms.data.txt", sep = "\t", header = TRUE)) %>% 
+  # Rename columns
+  dplyr::rename(COMPOUND_ID = Compound_ID, 
+                COMPOUND = Compound, 
+                TYPE = Type, 
+                SOURCE = Source) %>% 
+  # Convert to long format
+  tidyr::gather(SAMPLE.NAME, PROPORTION, -c(COMPOUND_ID, COMPOUND, TYPE, SOURCE)) %>% 
+  # Add sample information
+  dplyr::inner_join(as_tibble(fread("pyr.gc.sample.info.txt", sep = "\t", header = TRUE)), ., by = "SAMPLE.NAME") %>% 
+  # Calculate percentages
+  dplyr::mutate(PERCENTAGE = 100 * PROPORTION) %>% 
+  # Fix source names
+  dplyr::mutate(SOURCE = ifelse(SOURCE == "Lignin+TMAH", "Lignin", SOURCE), 
+                SOURCE = ifelse(SOURCE == "Phenol+TMAH", "Phenol", SOURCE), 
+                SOURCE = ifelse(SOURCE == "Unknown Origin", "Unknown", SOURCE)) %>% 
+  # Group table
+  dplyr::group_by(GROUP, SAMPLE.NAME, PLOT, SITE, TREATMENT, SUBSTRATE, SOURCE) %>% 
+  # Calculate totals
+  dplyr::summarise(PERCENTAGE = sum(PERCENTAGE)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Filter
+  dplyr::filter(SUBSTRATE == "root") %>% 
+  # Wide format
+  tidyr::spread(SOURCE, PERCENTAGE) %>% 
+  # Select relevant columns
+  dplyr::select(-GROUP, -SAMPLE.NAME, -SUBSTRATE) %>% 
+  # Sort
+  dplyr::arrange(PLOT)
+
+# Calculate totals by source, SOM
+pyr.gcms.som.source.tbl <- dplyr::as_tibble(data.table::fread("pyr.gcms.data.txt", sep = "\t", header = TRUE)) %>% 
+  # Rename columns
+  dplyr::rename(COMPOUND_ID = Compound_ID, 
+                COMPOUND = Compound, 
+                TYPE = Type, 
+                SOURCE = Source) %>% 
+  # Convert to long format
+  tidyr::gather(SAMPLE.NAME, PROPORTION, -c(COMPOUND_ID, COMPOUND, TYPE, SOURCE)) %>% 
+  # Add sample information
+  dplyr::inner_join(as_tibble(fread("pyr.gc.sample.info.txt", sep = "\t", header = TRUE)), ., by = "SAMPLE.NAME") %>% 
+  # Calculate percentages
+  dplyr::mutate(PERCENTAGE = 100 * PROPORTION) %>% 
+  # Fix source names
+  dplyr::mutate(SOURCE = ifelse(SOURCE == "Lignin+TMAH", "Lignin", SOURCE), 
+                SOURCE = ifelse(SOURCE == "Phenol+TMAH", "Phenol", SOURCE), 
+                SOURCE = ifelse(SOURCE == "Unknown Origin", "Unknown", SOURCE)) %>% 
+  # Group table
+  dplyr::group_by(GROUP, SAMPLE.NAME, PLOT, SITE, TREATMENT, SUBSTRATE, SOURCE) %>% 
+  # Calculate totals
+  dplyr::summarise(PERCENTAGE = sum(PERCENTAGE)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Filter
+  dplyr::filter(SUBSTRATE == "mineral.soil") %>% 
+  # Wide format
+  tidyr::spread(SOURCE, PERCENTAGE) %>% 
+  # Select relevant columns
+  dplyr::select(-GROUP, -SAMPLE.NAME, -SUBSTRATE) %>% 
+  # Sort
+  dplyr::arrange(PLOT)
+
+# Convert to data frame
+pyr.gcms.som.source.df <- as.data.frame(pyr.gcms.som.source.tbl, stringsAsFactors = FALSE)
+# Add row names
+row.names(pyr.gcms.som.source.df) <- pyr.gcms.som.source.df$PLOT
+# ANOVA on log2 transformed percentages
+pyr.gcms.som.source.aov <- manova(log2(cbind(as.matrix(pyr.gcms.som.source.df[4 : ncol(pyr.gcms.som.source.df)]))) ~ SITE * TREATMENT, data = pyr.gcms.som.source.df)
+# Get summary
+pyr.gcms.som.source.aov.summary <- summary.aov(pyr.gcms.som.source.aov)
+
+# Fisher's lsd, SOM N-bearing
+pyr.gcms.som.nbear.lsd <- LSD.test(aov(log2(cbind(as.matrix(pyr.gcms.som.source.df[7]))) ~ SITE * TREATMENT, data = pyr.gcms.som.source.df), c("SITE", "TREATMENT"), alpha = 0.1, p.adj = "none")
+
+# Fisher's lsd, SOM polysaccharide
+pyr.gcms.som.poly.lsd <- LSD.test(aov(log2(cbind(as.matrix(pyr.gcms.som.source.df[9]))) ~ SITE * TREATMENT, data = pyr.gcms.som.source.df), c("SITE", "TREATMENT"), alpha = 0.1, p.adj = "none")
+
+# Convert to data frame
+pyr.gcms.rootp.source.df <- as.data.frame(pyr.gcms.rootp.source.tbl)
+# Add row names
+row.names(pyr.gcms.rootp.source.df) <- pyr.gcms.rootp.source.df$PLOT
+# ANOVA
+pyr.gcms.rootp.source.aov <- manova(as.matrix(pyr.gcms.rootp.source.df[4 : ncol(pyr.gcms.rootp.source.df)]) ~ SITE * TREATMENT, data = pyr.gcms.rootp.source.df)
+# Get summary
+pyr.gcms.rootp.source.aov.summary <- summary.aov(pyr.gcms.rootp.source.aov)
+
+# Convert to data frame
+pyr.gcms.root.source.df <- as.data.frame(pyr.gcms.root.source.tbl)
+# Add row names
+row.names(pyr.gcms.root.source.df) <- pyr.gcms.root.source.df$PLOT
+# ANOVA
+pyr.gcms.root.source.aov <- manova(as.matrix(pyr.gcms.root.source.df[4 : ncol(pyr.gcms.root.source.df)]) ~ SITE * TREATMENT, data = pyr.gcms.rootp.source.df)
+# Get summary
+pyr.gcms.root.source.aov.summary <- summary.aov(pyr.gcms.root.source.aov)
+```
+
+## B. Create **Figure 1**  
+
+```{r create_biochem_source_bar_plots, fig.width = 7, fig.height = 8.67, fig.align = "center"}
+# Write facet label function
+facet_label <- function(x) {
+  # If pre-incubated root
+  if (x == "root.p") {
+    # Assign Undecomposed root litter
+    tmp1 <- "Un-decayed root litter"
+    # If incubated root
+  } else if (x == "root") {
+    # Assign Root litter at 12 months
+    tmp1 <- "Decaying root litter"
+    # If SOM
+  } else {
+    # Assign soil organic matter
+    tmp1 <- "Soil organic matter"
+  }
+  
+  # Return result
+  return(tmp1)
+}
+
+# Funcion for standard error
+se <- function(x) {
+  sd(x) / sqrt(length(x))
+}
+
+# Calculate means and SE by source
+pyr.gcms.source.tbl <- dplyr::as_tibble(data.table::fread("pyr.gcms.data.txt", sep = "\t", header = TRUE)) %>% 
+  # Rename columns
+  dplyr::rename(COMPOUND_ID = Compound_ID, 
+                COMPOUND = Compound, 
+                TYPE = Type, 
+                SOURCE = Source) %>% 
+  # Convert to long format
+  tidyr::gather(SAMPLE.NAME, PROPORTION, -c(COMPOUND_ID, COMPOUND, TYPE, SOURCE)) %>% 
+  # Add sample information
+  dplyr::inner_join(as_tibble(fread("pyr.gc.sample.info.txt", sep = "\t", header = TRUE)), ., by = "SAMPLE.NAME") %>% 
+  # Calculate percentages
+  dplyr::mutate(PERCENTAGE = 100 * PROPORTION) %>% 
+  # Fix source names
+  dplyr::mutate(SOURCE = ifelse(SOURCE == "Lignin+TMAH", "Lignin", SOURCE), 
+                SOURCE = ifelse(SOURCE == "Phenol+TMAH", "Phenol", SOURCE), 
+                SOURCE = ifelse(SOURCE == "Unknown Origin", "Unknown", SOURCE)) %>% 
+  # Group table
+  dplyr::group_by(GROUP, SAMPLE.NAME, PLOT, SITE, TREATMENT, SUBSTRATE, SOURCE) %>% 
+  # Calculate totals
+  dplyr::summarise(PERCENTAGE = sum(PERCENTAGE)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Group by treatment
+  dplyr::group_by(SOURCE, SUBSTRATE, TREATMENT) %>% 
+  # Calculate mean and SE
+  dplyr::summarise(MEAN.PERCENTAGE = mean(PERCENTAGE), 
+                   SE.PERCENTAGE = se(PERCENTAGE)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Calculate error bar maximums and minimums
+  dplyr::mutate(ERROR.BAR.MAX = MEAN.PERCENTAGE + SE.PERCENTAGE, 
+                ERROR.BAR.MIN = MEAN.PERCENTAGE - SE.PERCENTAGE) %>% 
+  # Add bottom error bar color and facet labels
+  dplyr::mutate(ERROR.BAR.COLOR = ifelse(TREATMENT == "Amb", "black", "white"), 
+                FACET.LABEL = rep(NA, nrow(.)), 
+                FACET.LABEL = sapply(SUBSTRATE, facet_label)) %>%  
+  # Create factor for facet labels
+  dplyr::mutate(FACET.LABEL = factor(FACET.LABEL, levels = c("Un-decayed root litter", "Decaying root litter", "Soil organic matter"))) %>% 
+  # Add significance label
+  dplyr::mutate(SIG.LABEL = ifelse(SUBSTRATE == "mineral.soil" & SOURCE == "Lignin" & TREATMENT == "Ndep", "*", ""))
+
+# Source biochemistry figure
+pyr.gcms.source.fig <- ggplot(pyr.gcms.source.tbl, aes(x = SOURCE, y = MEAN.PERCENTAGE, fill = TREATMENT)) + 
+  # Specify boxplot
+  geom_bar(stat = "identity", 
+           colour = "black", 
+           position = position_dodge(0.9)) + 
+  scale_y_continuous(expand = c(0, 0), 
+                     limits = c(0, 50),
+                     breaks = c(0, 10, 20, 30, 40, 50), 
+                     labels = c("0%", "10%", "20%", "30%", "40%", "50%")) + 
+  # Update labels on treatment/time legend
+  scale_fill_manual(values = c("white", "black"), 
+                    labels = c("  Ambient N", "  Experimental N")) + 
+  guides(title = NULL) + 
+  # Add x axis label
+  labs(title = NULL, 
+       x = NULL, 
+       # Add y axis label
+       y = "Biochemical composition\n ") + 
+  # Format plot
+  theme(legend.title = element_blank(), 
+        # Remove panel and legend backgrounds
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        legend.key = element_blank(), 
+        # Add axis lines
+        axis.line.x = element_line(colour = "black", size = 0.6),
+        axis.line.y = element_line(colour = "black", size = 0.6), 
+        # Format text
+        axis.title.y = element_text(colour = "black", size = 16, face = "bold"), 
+        axis.text.x = element_text(colour = "black", size = 10, face = "bold", angle = 30, hjust = 1), 
+        axis.ticks.x = element_blank(), 
+        axis.ticks.y = element_line(colour = "black", size = 0.6), 
+        axis.text.y = element_text(colour = "black", size = 9, face = "bold"), 
+        legend.text = element_text(colour = "black", size = 9, face = "bold")) + 
+  # Wrap into facets by substrate
+  facet_wrap(~ FACET.LABEL, 
+             scales = "free_x", 
+             ncol = 1) + 
+  geom_errorbar(aes(ymax = MEAN.PERCENTAGE, ymin = ERROR.BAR.MIN, colour = ERROR.BAR.COLOR), 
+                position = position_dodge(0.9), 
+                width = 0) + 
+  scale_color_identity() + 
+    geom_errorbar(aes(ymax = ERROR.BAR.MAX, ymin = MEAN.PERCENTAGE), 
+                  position = position_dodge(0.9), 
+                  width = 0, 
+                  colour = "black") + 
+  theme(legend.position = c(0.85, 0.95), 
+        strip.background = element_blank(), 
+        strip.text = element_text(colour = "black", size = 14, face = "bold")) + 
+  geom_text(data = pyr.gcms.source.tbl, 
+            aes(x = SOURCE, y = (pyr.gcms.source.tbl$ERROR.BAR.MAX + 5), 
+                label = SIG.LABEL), 
+            stat = "identity", 
+            size = 7)
+
+# Save image
+#ggsave("Figure_1.tiff", pyr.gcms.source.fig, device = "tiff", width = 7, height = 8.67, units = "in", dpi = 1200)
+#ggsave("Figure_1.png", pyr.gcms.source.fig, device = "png", width = 7, height = 8.67, units = "in", dpi = 300)
+
+# Calculate percent change
+pyr.gcms.som.perc.change.tbl <- pyr.gcms.source.tbl %>% 
+  dplyr::filter(SUBSTRATE == "mineral.soil") %>% 
+  dplyr::select(SOURCE, SUBSTRATE, TREATMENT, MEAN.PERCENTAGE) %>% 
+  tidyr::spread(TREATMENT, MEAN.PERCENTAGE) %>% 
+  dplyr::mutate(PERC.CHANGE = 100 * ((Ndep - Amb) * (1 / Amb)))
+```
+
+**Figure 1** is shown below:  
+
+```{r display_fig1, echo = FALSE, fig.width = 7, fig.height = 8.67, fig.align = "center"}
+# Display figure
+pyr.gcms.source.fig
+```
+
+# III. Sequence quality control  
+
+## A. Bacteria  
+
+### 1. 16S sequence processing using `mothur` 
+
+Bacterial sequences were subjected to the quality control pipeline outlined in the file named `mothur.16s.batch`, and run in [mothur v1.40.5](https://www.mothur.org/). `.oligos` files matching barcoded primer sequences to corresponding samples are contained in the same folder, and named to correspond with appropriate `.fastq` files. Running the file `mothur.16s.batch` in mothur produces a `.shared` file (an OTU table) with OTUs clustered at 97% sequence similarity. This `.shared` file is used as input for all further analyses performed in `R`.
+
+##  B. Fungi  
+
+### 1. 28S sequence processing through unique sequences  
+
+The file named `mothur.28s.uniques.batch` can be run in `mothur` to produce unique quality sequences (in a file named `Gradient.28S.Roots.combined.trim.unique.fasta`. This output was then subset into 3 equally-sized files in order to assign taxonomy using the [RDP classifier (release 11, update 5)](https://rdp.cme.msu.edu/classifier/classifier.jsp), as described below.  
+
+### 2. Subset unique sequences `.fasta` file  
+
+```{r subset_unique_fasta, eval = TRUE}
+# Read in fungal unique sequences .fasta by uncommenting the following code
+#f.unique.fasta <- read.fasta(file = "Gradient.28S.Roots.combined.trim.unique.fasta", seqtype = "DNA", as.string = FALSE, forceDNAtolower = FALSE, set.attributes = FALSE)
+
+# Subset the file
+#f.unique.1.fasta <- f.unique.fasta[1:40883]
+# Subset the file
+#f.unique.2.fasta <- f.unique.fasta[40884:81766]
+# Subset the file
+#f.unique.3.fasta <- f.unique.fasta[81767:122649]
+
+# Get max sequence length
+#f.unique.length <- max(sapply(f.unique.fasta, length))
+
+# Write out subset file by uncommenting the following code
+#write.fasta(sequences = f.unique.1.fasta, open = "w", names = names(f.unique.1.fasta), file.out = "Gradient.28S.Roots.combined.trim.unique.1.fasta", nbchar = f.unique.length, as.string = FALSE)
+# Write out subset file
+#write.fasta(sequences = f.unique.2.fasta, open = "w", names = names(f.unique.2.fasta), file.out = "Gradient.28S.Roots.combined.trim.unique.2.fasta", nbchar = f.unique.length, as.string = FALSE)
+# Write out subset file
+#write.fasta(sequences = f.unique.3.fasta, open = "w", names = names(f.unique.3.fasta), file.out = "Gradient.28S.Roots.combined.trim.unique.3.fasta", nbchar = f.unique.length, as.string = FALSE)
+```
+
+### 3. Classify unique 28S sequences  
+
+Sequences were uploaded to the [RDP classifier (release 11, update 5)](https://rdp.cme.msu.edu/classifier/classifier.jsp) and classified against the Fungal LSU Training Set 11. File headings from the output were then removed and files were concatenated into a single text file with taxonomic assignments, `Gradient.28S.Roots.combined.trim.unique.fasta_classified.txt`.  
+
+### 4. Format 28S initial taxonomy file  
+
+The concatenated RDP classification results were then formatted for `mothur` using the following code:  
+
+```{r format_28S_initial_tax, eval = TRUE, message = FALSE, results = "hide"}
+# Write a function to re-format percentages for mothur
+f_rdp_conf_format <- function(x) {
+  # If the value contains a percentage
+  if (grepl("%", x) == TRUE) {
+    # Add ( to the front of it
+    tmp1 <- paste("(", x, sep = "")
+    # Add ); to the end by replacing %
+    tmp2 <- gsub("\\%", ");", tmp1)
+    # Otherwise
+  } else {
+    # Return the same value
+    tmp2 <- x
+  }
+  # Return the value
+  return(tmp2)
+}
+
+# Read in initial taxonomy table
+f.tax.initial.tbl <- as_tibble(fread("Gradient.28S.Roots.combined.trim.unique.fasta_classified.txt", sep = "\t", header = FALSE)) %>% 
+  # Separate by ;
+  tidyr::separate(V1, c("SEQ.ID", "EXTRA", "ROOT", "ROOT.CONF", "KINGDOM", "KINGDOM.CONF", "PHYLUM", "PHYLUM.CONF", 
+                        "CLASS", "CLASS.CONF", "ORDER", "ORDER.CONF", "FAMILY", "FAMILY.CONF", "GENUS", "GENUS.CONF"), sep = ";") %>% 
+  # Update root confidence
+  dplyr::mutate(ROOT.CONF = sapply(ROOT.CONF, f_rdp_conf_format)) %>% 
+  # Update kingdom confidence
+  dplyr::mutate(KINGDOM.CONF = sapply(KINGDOM.CONF, f_rdp_conf_format)) %>% 
+  # Update phylum confidence
+  dplyr::mutate(PHYLUM.CONF = sapply(PHYLUM.CONF, f_rdp_conf_format)) %>% 
+  # Update class confidence
+  dplyr::mutate(CLASS.CONF = sapply(CLASS.CONF, f_rdp_conf_format)) %>% 
+  # Update order confidence
+  dplyr::mutate(ORDER.CONF = sapply(ORDER.CONF, f_rdp_conf_format)) %>% 
+  # Update family confidence
+  dplyr::mutate(FAMILY.CONF = sapply(FAMILY.CONF, f_rdp_conf_format)) %>% 
+  # Update genus confidence
+  dplyr::mutate(GENUS.CONF = sapply(GENUS.CONF, f_rdp_conf_format)) %>% 
+  # Remove the extra value
+  dplyr::select(-EXTRA) %>% 
+  # Replace NA values with blank
+  tidyr::replace_na(list(ROOT = "", ROOT.CONF = "", KINGDOM = "", KINGDOM.CONF = "", 
+                         PHYLUM = "", PHYLUM.CONF = "", CLASS = "", CLASS.CONF = "", 
+                         ORDER = "", ORDER.CONF = "", FAMILY = "", FAMILY.CONF = "", 
+                         GENUS = "", GENUS.CONF = "")) %>% 
+  # Combine into single entry
+  tidyr::unite(TAXONOMY, ROOT, ROOT.CONF, KINGDOM, KINGDOM.CONF, PHYLUM, PHYLUM.CONF, CLASS, CLASS.CONF, 
+                         ORDER, ORDER.CONF, FAMILY, FAMILY.CONF, GENUS, GENUS.CONF, sep = "")
+
+# Write out the result by uncommenting the following code
+#write.table(f.tax.initial.tbl, file = "Gradient.28S.Roots.combined.trim.unique.fasta.classified.taxonomy", sep = "\t", col.names = FALSE, row.names = FALSE, quote = FALSE)
+```
+
+### 5. Process sequences through pre-clustering and chimera removal in `mothur`  
+
+Using the new taxonomy file, sequences were then screened in `mothur` by removing non-fungal lineages, preclustering, and chimera removal by running the file named `mothur.28s.precluster.chimera.batch`. After de-gapping the `.fasta` file, sequences were uploaded to the RDP classifier to determine final taxaonomic classifications.    
+
+### 6. Format final 28S taxonomy file from RDP  
+
+The output from RDP was formatted for `mothur` (after removing the header) using the following code:  
+
+```{r format_final_28S_taxonomy, eval = TRUE, message = FALSE, results = "hide"}
+# Write a function to re-format unclassified taxa for mothur
+f_rdp_uncl_format <- function(x) {
+  # Extract only the probability
+  tmp1 <- gsub(".*\\(|\\)", "", x)
+  
+  # If the string is 3 or fewer characters in length
+  if (nchar(tmp1) <= 3) {
+    # Convert to numeric
+    tmp2 <- as.numeric(tmp1)
+    # If the number is <80
+    if (tmp2 < 80) {
+      # The sequence is unclassified
+      tmp3 <- "Unclassified"
+      # Otherwise
+    } else {
+      # Keep the original value
+      tmp3 <- x
+    }
+    # Otherwise
+  } else {
+    # Keep the original value
+    tmp3 <- x
+  }
+  # Return the value
+  return(tmp3)
+}
+
+# Read in final taxonomy table
+f.tax.final.tbl <- as_tibble(fread("Gradient.28S.Roots.combined.trim.unique.pick.good.filter.unique.precluster.pick.ng.fasta_classified.txt", sep = "\t", header = FALSE)) %>% 
+  # Separate by ;
+  tidyr::separate(V1, c("SEQ.ID", "EXTRA", "ROOT", "ROOT.CONF", "KINGDOM", "KINGDOM.CONF", "PHYLUM", "PHYLUM.CONF", 
+                        "CLASS", "CLASS.CONF", "ORDER", "ORDER.CONF", "FAMILY", "FAMILY.CONF", "GENUS", "GENUS.CONF"), sep = ";") %>% 
+  # Update root confidence
+  dplyr::mutate(ROOT.CONF = sapply(ROOT.CONF, f_rdp_conf_format)) %>% 
+  # Update kingdom confidence
+  dplyr::mutate(KINGDOM.CONF = sapply(KINGDOM.CONF, f_rdp_conf_format)) %>% 
+  # Update phylum confidence
+  dplyr::mutate(PHYLUM.CONF = sapply(PHYLUM.CONF, f_rdp_conf_format)) %>% 
+  # Update class confidence
+  dplyr::mutate(CLASS.CONF = sapply(CLASS.CONF, f_rdp_conf_format)) %>% 
+  # Update order confidence
+  dplyr::mutate(ORDER.CONF = sapply(ORDER.CONF, f_rdp_conf_format)) %>% 
+  # Update family confidence
+  dplyr::mutate(FAMILY.CONF = sapply(FAMILY.CONF, f_rdp_conf_format)) %>% 
+  # Update genus confidence
+  dplyr::mutate(GENUS.CONF = sapply(GENUS.CONF, f_rdp_conf_format)) %>% 
+  # Remove the extra value
+  dplyr::select(-EXTRA) %>% 
+  # Replace NA values with blank
+  tidyr::replace_na(list(ROOT = "", ROOT.CONF = "", KINGDOM = "", KINGDOM.CONF = "", 
+                         PHYLUM = "", PHYLUM.CONF = "", CLASS = "", CLASS.CONF = "", 
+                         ORDER = "", ORDER.CONF = "", FAMILY = "", FAMILY.CONF = "", 
+                         GENUS = "", GENUS.CONF = "")) %>% 
+  # Combine into single entry
+  tidyr::unite(TAXONOMY, ROOT, ROOT.CONF, KINGDOM, KINGDOM.CONF, PHYLUM, PHYLUM.CONF, CLASS, CLASS.CONF, 
+                         ORDER, ORDER.CONF, FAMILY, FAMILY.CONF, GENUS, GENUS.CONF, sep = "") %>% 
+  # Split taxonomy
+  tidyr::separate(TAXONOMY, c("ROOT", "KINGDOM", "PHYLUM", "CLASS", "ORDER", "FAMILY", "GENUS"), sep = ";") %>% 
+  # Update root confidence
+  dplyr::mutate(ROOT = sapply(ROOT, f_rdp_uncl_format)) %>% 
+  # Update kingdom confidence
+  dplyr::mutate(KINGDOM = sapply(KINGDOM, f_rdp_uncl_format)) %>% 
+  # Update phylum confidence
+  dplyr::mutate(PHYLUM = sapply(PHYLUM, f_rdp_uncl_format)) %>% 
+  # Update class confidence
+  dplyr::mutate(CLASS = sapply(CLASS, f_rdp_uncl_format)) %>% 
+  # Update order confidence
+  dplyr::mutate(ORDER = sapply(ORDER, f_rdp_uncl_format)) %>% 
+  # Update family confidence
+  dplyr::mutate(FAMILY = sapply(FAMILY, f_rdp_uncl_format)) %>% 
+  # Update genus confidence
+  dplyr::mutate(GENUS = sapply(GENUS, f_rdp_uncl_format)) %>% 
+  # Combine into single entry
+  tidyr::unite(TAXONOMY, ROOT, KINGDOM, PHYLUM, CLASS, ORDER, FAMILY, GENUS, sep = ";") %>% 
+  # Add semicolon to end
+  dplyr::mutate(TAXONOMY = paste(TAXONOMY, ";", sep = ""))
+
+# Write out the result by uncommenting the following code
+#write.table(f.tax.final.tbl, file = "Gradient.28S.Roots.combined.trim.unique.pick.good.filter.unique.precluster.pick.ng.fasta.taxonomy", sep = "\t", col.names = FALSE, row.names = FALSE, quote = FALSE)
+```
+
+### 7. Final sequence processing in `mothur`  
+
+The final taxonomy file was used in `mothur` to remove any remaining non-fungal sequences. OTUs were then clustered at 99% sequence similarity and a `.shared` file (*i.e.*, OTU table) was created. The code to run these analyses is contained in the file `mothur.28s.cluster.batch`.  
+
+## C. Sequence processing summary  
+
+### 1. Sequence summary statistics  
+
+The following code calculates sequencing depth per sample for fungi and bacteria.  
+
+```{r seq_summary_stats}
+# Calculate sequencing depth summary statistics, fungi
+f.seq.depth.tbl <- as_tibble(fread("Gradient.28S.Roots.combined.trim.unique.pick.good.filter.unique.precluster.pick.pick.opti_mcc.shared", sep = "\t", header = TRUE)) %>% 
+  # Remove unnecessary columns
+  dplyr::select(-c(label, numOtus)) %>% 
+  # Rename Group column
+  dplyr::rename(GROUP = Group) %>% 
+  # Convert to long format
+  tidyr::gather(OTU, COUNT, -GROUP) %>% 
+  # Group by OTU
+  dplyr::group_by(GROUP) %>% 
+  # Sum OTU counts
+  dplyr::summarise(GROUP.COUNT = sum(COUNT)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Summary statistics
+  dplyr::summarise(total.seqs = sum(GROUP.COUNT), 
+                   minium.seqs = min(GROUP.COUNT), 
+                   maximum.seqs = max(GROUP.COUNT), 
+                   median.seqs = median(GROUP.COUNT), 
+                   mean.seqs = mean(GROUP.COUNT), 
+                   sd.seqs = sd(GROUP.COUNT)) %>% 
+  # Gather data
+  tidyr::gather(PARAMETER, SEQUENCE)
+
+# Bacteria
+b.seq.depth.tbl <- as_tibble(fread("Gradient.16S.Roots.combined.trim.unique.good.filter.unique.precluster.pick.pick.opti_mcc.shared", sep = "\t", header = TRUE)) %>% 
+  # Remove unnecessary columns
+  dplyr::select(-c(label, numOtus)) %>% 
+  # Rename Group column
+  dplyr::rename(GROUP = Group) %>% 
+  # Convert to long format
+  tidyr::gather(OTU, COUNT, -GROUP) %>% 
+  # Group by OTU
+  dplyr::group_by(GROUP) %>% 
+  # Sum OTU counts
+  dplyr::summarise(GROUP.COUNT = sum(COUNT)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Summary statistics
+  dplyr::summarise(total.seqs = sum(GROUP.COUNT), 
+                   minium.seqs = min(GROUP.COUNT), 
+                   maximum.seqs = max(GROUP.COUNT), 
+                   median.seqs = median(GROUP.COUNT), 
+                   mean.seqs = mean(GROUP.COUNT), 
+                   sd.seqs = sd(GROUP.COUNT)) %>% 
+  # Gather data
+  tidyr::gather(PARAMETER, SEQUENCE)
+```
+
+Fungal sequencing depth is summarized as follows:  
+
+```{r fungi_depth, echo = FALSE}
+# Display sequencing depth
+kable(f.seq.depth.tbl)
+```
+
+Bacterial sequencing depth is summarized as follows:  
+
+```{r bacteria_depth, echo = FALSE}
+# Display sequencing depth
+kable(b.seq.depth.tbl)
+```
+
+### 2. Taxonomic distribution  
+
+The following code summarizes the taxonomic distribution of sequences at varying levels of taxonomic resolution.  
+
+```{r seq_distribution, results = "hide", message = FALSE}
+# Calculate sequence totals per OTU by sample, fungi
+f.seq.tot.tbl <- as_tibble(fread("Gradient.28S.Roots.combined.trim.unique.pick.good.filter.unique.precluster.pick.pick.opti_mcc.shared", sep = "\t", header = TRUE)) %>% 
+  # Remove unnecessary columns
+  dplyr::select(-c(label, numOtus)) %>% 
+  # Rename Group column
+  dplyr::rename(GROUP = Group) %>% 
+  # Convert to long format
+  tidyr::gather(OTU, COUNT, -GROUP) %>% 
+  # Group by OTU
+  dplyr::group_by(OTU) %>% 
+  # Sum OTU counts
+  dplyr::summarise(OTU.COUNT = sum(COUNT)) %>% 
+  # Ungroup
+  dplyr::ungroup()
+
+# Determine sequence distributions among phyla, fungi
+f.p.seq.distr.tbl <- as_tibble(fread("Gradient.28S.Roots.combined.trim.unique.pick.good.filter.unique.precluster.pick.pick.opti_mcc.0.01.cons.taxonomy", sep = "\t", header = TRUE)) %>% 
+  # Rename columns
+  dplyr::rename(SIZE = Size, TAXONOMY = Taxonomy) %>% 
+  # Remove SIZE column
+  dplyr::select(-SIZE) %>% 
+  # Separate taxonomic ranks
+  tidyr::separate(TAXONOMY, c("ROOT", "KINGDOM", "PHYLUM", "CLASS", "ORDER", "FAMILY", "GENUS"), ";") %>% 
+  # Convert to long format
+  tidyr::gather(TAXONOMIC.RANK, TAXONOMIC.CLASSIFICATION, -OTU) %>% 
+  # Clean up taxonomy
+  dplyr::mutate(CLEAN.TAXONOMIC.CLASSIFICATION = gsub("\\(\\d.*", "", TAXONOMIC.CLASSIFICATION)) %>% 
+  # Drop old taxonomy
+  dplyr::select(-TAXONOMIC.CLASSIFICATION) %>% 
+  # Convert back to wide format
+  tidyr::spread(TAXONOMIC.RANK, CLEAN.TAXONOMIC.CLASSIFICATION) %>% 
+  # Reorder the columns
+  dplyr::select(OTU, PHYLUM, CLASS, ORDER, FAMILY, GENUS) %>% 
+  # Add OTU counts
+  dplyr::inner_join(., f.seq.tot.tbl, by = "OTU") %>% 
+  # Group by phylum
+  dplyr::group_by(PHYLUM) %>% 
+  # Calculate OTU counts
+  dplyr::summarise(NUM.SEQS = sum(OTU.COUNT)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Calculate percentages
+  dplyr::mutate(PERC.SEQS = 100 * (NUM.SEQS * (1 / sum(NUM.SEQS)))) %>% 
+  # Sort
+  dplyr::arrange(desc(PERC.SEQS)) %>% 
+  # Format
+  dplyr::mutate(PERC.SEQS = format(PERC.SEQS, scientific = FALSE))
+
+# Fungal classes
+f.c.seq.distr.tbl <- as_tibble(fread("Gradient.28S.Roots.combined.trim.unique.pick.good.filter.unique.precluster.pick.pick.opti_mcc.0.01.cons.taxonomy", sep = "\t", header = TRUE)) %>% 
+  # Rename columns
+  dplyr::rename(SIZE = Size, TAXONOMY = Taxonomy) %>% 
+  # Remove SIZE column
+  dplyr::select(-SIZE) %>% 
+  # Separate taxonomic ranks
+  tidyr::separate(TAXONOMY, c("ROOT", "KINGDOM", "PHYLUM", "CLASS", "ORDER", "FAMILY", "GENUS"), ";") %>% 
+  # Convert to long format
+  tidyr::gather(TAXONOMIC.RANK, TAXONOMIC.CLASSIFICATION, -OTU) %>% 
+  # Clean up taxonomy
+  dplyr::mutate(CLEAN.TAXONOMIC.CLASSIFICATION = gsub("\\(\\d.*", "", TAXONOMIC.CLASSIFICATION)) %>% 
+  # Drop old taxonomy
+  dplyr::select(-TAXONOMIC.CLASSIFICATION) %>% 
+  # Convert back to wide format
+  tidyr::spread(TAXONOMIC.RANK, CLEAN.TAXONOMIC.CLASSIFICATION) %>% 
+  # Reorder the columns
+  dplyr::select(OTU, PHYLUM, CLASS, ORDER, FAMILY, GENUS) %>% 
+  # Add OTU counts
+  dplyr::inner_join(., f.seq.tot.tbl, by = "OTU") %>% 
+  # Group by class
+  dplyr::group_by(PHYLUM, CLASS) %>% 
+  # Calculate OTU counts
+  dplyr::summarise(NUM.SEQS = sum(OTU.COUNT)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Calculate percentages
+  dplyr::mutate(PERC.SEQS = 100 * (NUM.SEQS * (1 / sum(NUM.SEQS)))) %>% 
+  # Sort
+  dplyr::arrange(desc(PERC.SEQS)) %>% 
+  # Format
+  dplyr::mutate(PERC.SEQS = format(PERC.SEQS, scientific = FALSE))
+
+# Fungal orders
+f.o.seq.distr.tbl <- as_tibble(fread("Gradient.28S.Roots.combined.trim.unique.pick.good.filter.unique.precluster.pick.pick.opti_mcc.0.01.cons.taxonomy", sep = "\t", header = TRUE)) %>% 
+  # Rename columns
+  dplyr::rename(SIZE = Size, TAXONOMY = Taxonomy) %>% 
+  # Remove SIZE column
+  dplyr::select(-SIZE) %>% 
+  # Separate taxonomic ranks
+  tidyr::separate(TAXONOMY, c("ROOT", "KINGDOM", "PHYLUM", "CLASS", "ORDER", "FAMILY", "GENUS"), ";") %>% 
+  # Convert to long format
+  tidyr::gather(TAXONOMIC.RANK, TAXONOMIC.CLASSIFICATION, -OTU) %>% 
+  # Clean up taxonomy
+  dplyr::mutate(CLEAN.TAXONOMIC.CLASSIFICATION = gsub("\\(\\d.*", "", TAXONOMIC.CLASSIFICATION)) %>% 
+  # Drop old taxonomy
+  dplyr::select(-TAXONOMIC.CLASSIFICATION) %>% 
+  # Convert back to wide format
+  tidyr::spread(TAXONOMIC.RANK, CLEAN.TAXONOMIC.CLASSIFICATION) %>% 
+  # Reorder the columns
+  dplyr::select(OTU, PHYLUM, CLASS, ORDER, FAMILY, GENUS) %>% 
+  # Add OTU counts
+  dplyr::inner_join(., f.seq.tot.tbl, by = "OTU") %>% 
+  # Group by order
+  dplyr::group_by(PHYLUM, CLASS, ORDER) %>% 
+  # Calculate OTU counts
+  dplyr::summarise(NUM.SEQS = sum(OTU.COUNT)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Calculate percentages
+  dplyr::mutate(PERC.SEQS = 100 * (NUM.SEQS * (1 / sum(NUM.SEQS)))) %>% 
+  # Sort
+  dplyr::arrange(desc(PERC.SEQS)) %>% 
+  # Format
+  dplyr::mutate(PERC.SEQS = format(PERC.SEQS, scientific = FALSE))
+
+# Fungal genera
+f.g.seq.distr.tbl <- as_tibble(fread("Gradient.28S.Roots.combined.trim.unique.pick.good.filter.unique.precluster.pick.pick.opti_mcc.0.01.cons.taxonomy", sep = "\t", header = TRUE)) %>% 
+  # Rename columns
+  dplyr::rename(SIZE = Size, TAXONOMY = Taxonomy) %>% 
+  # Remove SIZE column
+  dplyr::select(-SIZE) %>% 
+  # Separate taxonomic ranks
+  tidyr::separate(TAXONOMY, c("ROOT", "KINGDOM", "PHYLUM", "CLASS", "ORDER", "FAMILY", "GENUS"), ";") %>% 
+  # Convert to long format
+  tidyr::gather(TAXONOMIC.RANK, TAXONOMIC.CLASSIFICATION, -OTU) %>% 
+  # Clean up taxonomy
+  dplyr::mutate(CLEAN.TAXONOMIC.CLASSIFICATION = gsub("\\(\\d.*", "", TAXONOMIC.CLASSIFICATION)) %>% 
+  # Drop old taxonomy
+  dplyr::select(-TAXONOMIC.CLASSIFICATION) %>% 
+  # Convert back to wide format
+  tidyr::spread(TAXONOMIC.RANK, CLEAN.TAXONOMIC.CLASSIFICATION) %>% 
+  # Reorder the columns
+  dplyr::select(OTU, PHYLUM, CLASS, ORDER, FAMILY, GENUS) %>% 
+  # Add OTU counts
+  dplyr::inner_join(., f.seq.tot.tbl, by = "OTU") %>% 
+  # Group by genus
+  dplyr::group_by(PHYLUM, CLASS, ORDER, FAMILY, GENUS) %>% 
+  # Calculate OTU counts
+  dplyr::summarise(NUM.SEQS = sum(OTU.COUNT)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Calculate percentages
+  dplyr::mutate(PERC.SEQS = 100 * (NUM.SEQS * (1 / sum(NUM.SEQS)))) %>% 
+  # Sort
+  dplyr::arrange(desc(PERC.SEQS)) %>% 
+  # Format
+  dplyr::mutate(PERC.SEQS = format(PERC.SEQS, scientific = FALSE))
+
+## Calculate sequence totals per OTU by sample, bacteria
+b.seq.tot.tbl <- as_tibble(fread("Gradient.16S.Roots.combined.trim.unique.good.filter.unique.precluster.pick.pick.opti_mcc.shared", sep = "\t", header = TRUE)) %>% 
+  # Remove unnecessary columns
+  dplyr::select(-c(label, numOtus)) %>% 
+  # Rename Group column
+  dplyr::rename(GROUP = Group) %>% 
+  # Convert to long format
+  tidyr::gather(OTU, COUNT, -GROUP) %>% 
+  # Group by OTU
+  dplyr::group_by(OTU) %>% 
+  # Sum OTU counts
+  dplyr::summarise(OTU.COUNT = sum(COUNT)) %>% 
+  # Ungroup
+  dplyr::ungroup()
+
+# Bacterial phyla
+b.p.seq.distr.tbl <- as_tibble(fread("Gradient.16S.Roots.combined.trim.unique.good.filter.unique.precluster.pick.pick.opti_mcc.0.03.cons.taxonomy", sep = "\t", header = TRUE)) %>% 
+  # Rename columns
+  dplyr::rename(SIZE = Size, TAXONOMY = Taxonomy) %>% 
+  # Remove SIZE column
+  dplyr::select(-SIZE) %>% 
+  # Separate taxonomic ranks
+  tidyr::separate(TAXONOMY, c("DOMAIN", "PHYLUM", "CLASS", "ORDER", "FAMILY", "GENUS"), ";") %>% 
+  # Convert to long format
+  tidyr::gather(TAXONOMIC.RANK, TAXONOMIC.CLASSIFICATION, -OTU) %>% 
+  # Clean up taxonomy
+  dplyr::mutate(CLEAN.TAXONOMIC.CLASSIFICATION = gsub("\\(\\d.*", "", TAXONOMIC.CLASSIFICATION)) %>% 
+  # Drop old taxonomy
+  dplyr::select(-TAXONOMIC.CLASSIFICATION) %>% 
+  # Convert back to wide format
+  tidyr::spread(TAXONOMIC.RANK, CLEAN.TAXONOMIC.CLASSIFICATION) %>% 
+  # Reorder the columns
+  dplyr::select(OTU, PHYLUM, CLASS, ORDER, FAMILY, GENUS) %>% 
+  # Add OTU counts
+  dplyr::inner_join(., b.seq.tot.tbl, by = "OTU") %>% 
+  # Group by phylum
+  dplyr::group_by(PHYLUM) %>% 
+  # Calculate OTU counts
+  dplyr::summarise(NUM.SEQS = sum(OTU.COUNT)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Calculate percentages
+  dplyr::mutate(PERC.SEQS = 100 * (NUM.SEQS * (1 / sum(NUM.SEQS)))) %>% 
+  # Sort
+  dplyr::arrange(desc(PERC.SEQS)) %>% 
+  # Format
+  dplyr::mutate(PERC.SEQS = format(PERC.SEQS, scientific = FALSE))
+```
+
+Fungal taxonomic distribution at the phylum level is summarized as follows:  
+
+```{r fungi_phylum, echo = FALSE}
+# Display sequencing depth
+kable(f.p.seq.distr.tbl)
+```
+
+Fungal taxonomic distribution at the class level is summarized as follows:  
+
+```{r fungi_class, echo = FALSE}
+# Display sequencing depth
+kable(f.c.seq.distr.tbl)
+```
+
+Fungal taxonomic distribution at the order level is summarized as follows (table is truncated to save space):  
+
+```{r fungi_order, echo = FALSE}
+# Display sequencing depth
+kable(f.o.seq.distr.tbl[1:22, ])
+```
+
+Fungal taxonomic distribution at the genus level is summarized as follows (table is truncated to save space):  
+
+```{r fungi_genus, echo = FALSE}
+# Display sequencing depth
+kable(f.g.seq.distr.tbl[1:30, ])
+```
+
+Bacterial taxonomic distribution at the phylum level is summarized as follows:  
+
+```{r bacteria_phylum, echo = FALSE}
+# Display sequencing depth
+kable(b.p.seq.distr.tbl)
+```
+
+# IV. Microbial community composition  
+
+The following set of analyses were performed to determine the effect of experimental N deposition on microbial community composition, as well as the relationships between microbial community composition and the relative abundances of biochemical compound classes in soil organic matter.  
+
+The first set of code formats the experimental design table.  
+
+```{r experimental_design}
+# Read in experimental design
+exp.tbl <- as_tibble(fread("exp.design.txt", sep = "\t", header = TRUE))
+```
+
+## A. Agaricomycetes and Actinobacteria  
+
+### 1. Agaricomycetes ANOVA  
+
+The following code runs a two-way ANOVA to test the effect of experimental N deposition on the abundance of Agaricomycetes.  
+
+```{r agaricomycetes_anova, results = "hide", message = FALSE}
+# Get fungal OTU table and format
+f.otu.tbl <- as_tibble(fread("Gradient.28S.Roots.combined.trim.unique.pick.good.filter.unique.precluster.pick.pick.opti_mcc.shared", sep = "\t", header = TRUE)) %>% 
+  # Remove unnecessary columns
+  dplyr::select(-c(label, numOtus)) %>% 
+  # Rename Group column
+  dplyr::rename(GROUP = Group) %>% 
+  # Convert to long format
+  tidyr::gather(OTU, COUNT, -GROUP)
+
+# Format fungal taxonomy and get class counts by group
+f.class.tbl <- as_tibble(fread("Gradient.28S.Roots.combined.trim.unique.pick.good.filter.unique.precluster.pick.pick.opti_mcc.0.01.cons.taxonomy", sep = "\t", header = TRUE)) %>% 
+  # Rename columns
+  dplyr::rename(SIZE = Size, TAXONOMY = Taxonomy) %>% 
+  # Remove SIZE column
+  dplyr::select(-SIZE) %>% 
+  # Separate taxonomic ranks
+  tidyr::separate(TAXONOMY, c("ROOT", "KINGDOM", "PHYLUM", "CLASS", "ORDER", "FAMILY", "GENUS"), ";") %>% 
+  # Convert to long format
+  tidyr::gather(TAXONOMIC.RANK, TAXONOMIC.CLASSIFICATION, -OTU) %>% 
+  # Clean up taxonomy
+  dplyr::mutate(CLEAN.TAXONOMIC.CLASSIFICATION = gsub("\\(\\d.*", "", TAXONOMIC.CLASSIFICATION)) %>% 
+  # Drop old taxonomy
+  dplyr::select(-TAXONOMIC.CLASSIFICATION) %>% 
+  # Merge with OTU counts
+  dplyr::inner_join(., f.otu.tbl, by = "OTU") %>% 
+  # Convert to wide format
+  tidyr::spread(TAXONOMIC.RANK, CLEAN.TAXONOMIC.CLASSIFICATION) %>% 
+  # Group
+  dplyr::group_by(GROUP, PHYLUM, CLASS) %>% 
+  # Calculate order counts
+  dplyr::summarise(COUNT = sum(COUNT)) %>% 
+  # Ungroup
+  dplyr::ungroup()
+
+# Hellinger transform class abundances
+f.class.h.tbl <- f.class.tbl %>% 
+  # Add order ID column
+  tidyr::unite(CLASS.ID, PHYLUM, CLASS, sep = ".", remove = FALSE) %>% 
+  # Replace spaces with underscores
+  dplyr::mutate(CLASS.ID = gsub(" ", "_", CLASS.ID)) %>% 
+  # Add experimental design
+  dplyr::inner_join(exp.tbl, ., by = "GROUP") %>% 
+  # Group by PLOT
+  dplyr::group_by(PLOT) %>% 
+  # Hellinger transform each OTU
+  dplyr::mutate(HELLINGER = sqrt(COUNT / sum(COUNT))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Calculate total sum
+  dplyr::mutate(TOTAL.COUNT = sum(COUNT)) %>% 
+  # Group
+  dplyr::group_by(CLASS.ID) %>% 
+  # Calculate total percentage
+  dplyr::mutate(TOTAL.PERC = (100 * (sum(COUNT) * (1 / TOTAL.COUNT)))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Select only Agaricomycetes
+  dplyr::filter(CLASS == "Agaricomycetes") %>% 
+  # Select relevant columns
+  dplyr::select(PLOT, SITE, TREATMENT, CLASS.ID, HELLINGER) %>% 
+  # Convert to wide format
+  tidyr::spread(CLASS.ID, HELLINGER)
+
+# Convert to data frame
+f.class.h.df <- as.data.frame(f.class.h.tbl)
+# Add row names
+row.names(f.class.h.df) <- f.class.h.df$GROUP
+# ANOVA
+f.class.h.aov <- aov(as.matrix(f.class.h.df[4]) ~ SITE * TREATMENT, data = f.class.h.df)
+# Get summary
+f.class.h.aov.summary <- summary.aov(f.class.h.aov)
+```
+
+ANOVA results are shown below:  
+
+```{r agarico_display_anova, echo = FALSE}
+# Display output
+f.class.h.aov.summary
+```
+
+### 2. Agaricomycetes percent change  
+
+The percent change in the abundance of Agaricomycetes between experimental N deposition and ambient N deposition treatments was calculated as follows:  
+
+```{r agaricomycetes_percent_change}
+# Get percent change class table
+f.class.perc.change.tbl <- f.class.tbl %>% 
+  # Add order ID column
+  tidyr::unite(CLASS.ID, PHYLUM, CLASS, sep = ".", remove = FALSE) %>% 
+  # Replace spaces with underscores
+  dplyr::mutate(CLASS.ID = gsub(" ", "_", CLASS.ID)) %>% 
+  # Add experimental design
+  dplyr::inner_join(exp.tbl, ., by = "GROUP") %>% 
+  # Group by PLOT
+  dplyr::group_by(PLOT) %>% 
+  # Calculate percentages
+  dplyr::mutate(PERC = 100 * (COUNT / sum(COUNT))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Calculate total sum
+  dplyr::mutate(TOTAL.COUNT = sum(COUNT)) %>% 
+  # Group
+  dplyr::group_by(CLASS.ID) %>% 
+  # Calculate total percentage
+  dplyr::mutate(TOTAL.PERC = (100 * (sum(COUNT) * (1 / TOTAL.COUNT)))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Select Agaricomycetes
+  dplyr::filter(CLASS == "Agaricomycetes") %>% 
+  # Select relevant columns
+  dplyr::select(PLOT, SITE, TREATMENT, CLASS.ID, PERC) %>% 
+  # Group
+  dplyr::group_by(CLASS.ID, TREATMENT) %>% 
+  # Calculate mean and SE
+  dplyr::summarise(MEAN.PERC = mean(PERC), 
+                   SE.PERC = se(PERC)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Convert to long format
+  tidyr::gather(PARAMETER, PERC, -CLASS.ID, -TREATMENT) %>% 
+  # Create new parameter column
+  tidyr::unite(PARAMETER, TREATMENT, PARAMETER, sep = "_") %>% 
+  # Convert to wide format
+  tidyr::spread(PARAMETER, PERC) %>% 
+  # Calculate percent change
+  dplyr::mutate(PERC.CHANGE = 100 * ((Ndep_MEAN.PERC - Amb_MEAN.PERC) * (1 / Amb_MEAN.PERC)))
+
+# Get percent class table
+f.class.perc.tbl <- f.class.tbl %>% 
+  # Add order ID column
+  tidyr::unite(CLASS.ID, PHYLUM, CLASS, sep = ".", remove = FALSE) %>% 
+  # Replace spaces with underscores
+  dplyr::mutate(CLASS.ID = gsub(" ", "_", CLASS.ID)) %>% 
+  # Add experimental design
+  dplyr::inner_join(exp.tbl, ., by = "GROUP") %>% 
+  # Group by PLOT
+  dplyr::group_by(PLOT) %>% 
+  # Calculate percentages
+  dplyr::mutate(PERC = 100 * (COUNT / sum(COUNT))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Calculate total sum
+  dplyr::mutate(TOTAL.COUNT = sum(COUNT)) %>% 
+  # Group
+  dplyr::group_by(CLASS.ID) %>% 
+  # Calculate total percentage
+  dplyr::mutate(TOTAL.PERC = (100 * (sum(COUNT) * (1 / TOTAL.COUNT)))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Select Agaricomycetes
+  dplyr::filter(CLASS == "Agaricomycetes") %>% 
+  # Select relevant columns
+  dplyr::select(PLOT, SITE, TREATMENT, CLASS.ID, PERC) %>% 
+  # Group
+  dplyr::group_by(CLASS.ID, TREATMENT) %>% 
+  # Calculate mean and SE
+  dplyr::summarise(MEAN.PERC = mean(PERC), 
+                   SE.PERC = se(PERC)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Separate CLASS.ID column
+  tidyr::separate(CLASS.ID, c("PHYLUM", "CLASS"), sep = "\\.") %>% 
+  # Calculate error bar limits
+  dplyr::mutate(ERROR.BAR.MAX = MEAN.PERC + SE.PERC, 
+                ERROR.BAR.MIN = MEAN.PERC - SE.PERC) %>% 
+  # Add bottom error bar color
+  dplyr::mutate(ERROR.BAR.COLOR = ifelse(TREATMENT == "Amb", "black", "white")) %>% 
+  # Add significance label
+  dplyr::mutate(SIG.LABEL = c("", "*"))
+```
+
+Experimental N deposition decreased the relative abundance of Agaricomycetes by `r round(f.class.perc.change.tbl$PERC.CHANGE[1], 0)`%.  
+
+### 3. Construct Agaricomycetes bar plot  
+
+The following code produces a bar plot for the abundance of Agaricomycetes that will later be used to construct **Figure S2**.  
+
+```{r agaricomycetes_bar_plot}
+# Fungi figure
+f.class.fig <- ggplot(f.class.perc.tbl, aes(x = CLASS, y = MEAN.PERC, fill = TREATMENT)) + 
+  # Specify boxplot
+  geom_bar(stat = "identity", 
+           colour = "black", 
+           position = position_dodge(0.9)) + 
+  geom_errorbar(aes(ymax = MEAN.PERC, ymin = ERROR.BAR.MIN, colour = ERROR.BAR.COLOR), 
+                position = position_dodge(0.9), 
+                width = 0) + 
+  scale_color_identity() + 
+  geom_errorbar(aes(ymax = ERROR.BAR.MAX, ymin = MEAN.PERC), 
+                position = position_dodge(0.9), 
+                width = 0, 
+                colour = "black") + 
+  scale_y_continuous(expand = c(0, 0), 
+                     limits = c(0, 70),
+                     breaks = c(0, 10, 20, 30, 40, 50, 60, 70), 
+                     labels = c("0%", "10%", "20%", "30%", "40%", "50%", "60%", "70%")) + 
+  # Update labels on treatment/time legend
+  scale_fill_manual(values = c("white", "black"), 
+                    labels = c("  Ambient N  ", "  Experimental N")) + 
+  guides(title = NULL) + 
+  # Add x axis label
+  labs(title = "Agaricomycetes", 
+       x = NULL, 
+       # Add y axis label
+       y = NULL) + 
+  # Format plot
+  theme(legend.title = element_blank(), 
+        # Remove panel and legend backgrounds
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        legend.key = element_blank(), 
+        # Add axis lines
+        axis.line.x = element_line(colour = "black", size = 0.6),
+        axis.line.y = element_line(colour = "black", size = 0.6), 
+        # Format text
+        plot.title = element_text(colour = "black", size = 10, face = "bold", hjust = 0.5), 
+        axis.title.y = element_text(colour = "black", size = 14, face = "bold"), 
+        axis.text.x = element_blank(), 
+        axis.ticks.x = element_blank(), 
+        axis.ticks.y = element_line(colour = "black", size = 0.6), 
+        axis.text.y = element_text(colour = "black", size = 8, face = "bold"), 
+        legend.text = element_text(colour = "black", size = 8, face = "bold")) + 
+  geom_text(aes(label = SIG.LABEL, y = ERROR.BAR.MAX + 5), 
+            stat = "identity", 
+            position = position_dodge(0.9), 
+            size = 6)
+```
+
+### 4. Actinobacteria ANOVA  
+
+The following code is used to run a two-way ANOVA to test the effects of experimental N deposition on the abundance of Actinobacteria.  
+
+```{r actinobacteria_anova, results = "hide", message = FALSE}
+# Get bacteria OTU table and format
+b.otu.tbl <- as_tibble(fread("Gradient.16S.Roots.combined.trim.unique.good.filter.unique.precluster.pick.pick.opti_mcc.shared", sep = "\t", header = TRUE)) %>% 
+  # Remove unnecessary columns
+  dplyr::select(-c(label, numOtus)) %>% 
+  # Rename Group column
+  dplyr::rename(GROUP = Group) %>% 
+  # Convert to long format
+  tidyr::gather(OTU, COUNT, -GROUP)
+
+# Format bacterial taxonomy and get phylum counts by group
+b.phylum.tbl <- as_tibble(fread("Gradient.16S.Roots.combined.trim.unique.good.filter.unique.precluster.pick.pick.opti_mcc.0.03.cons.taxonomy", sep = "\t", header = TRUE)) %>% 
+  # Rename columns
+  dplyr::rename(SIZE = Size, TAXONOMY = Taxonomy) %>% 
+  # Remove SIZE column
+  dplyr::select(-SIZE) %>% 
+  # Separate taxonomic ranks
+  tidyr::separate(TAXONOMY, c("DOMAIN", "PHYLUM", "CLASS", "ORDER", "FAMILY", "GENUS"), ";") %>% 
+  # Convert to long format
+  tidyr::gather(TAXONOMIC.RANK, TAXONOMIC.CLASSIFICATION, -OTU) %>% 
+  # Clean up taxonomy
+  dplyr::mutate(CLEAN.TAXONOMIC.CLASSIFICATION = gsub("\\(\\d.*", "", TAXONOMIC.CLASSIFICATION)) %>% 
+  # Drop old taxonomy
+  dplyr::select(-TAXONOMIC.CLASSIFICATION) %>% 
+  # Merge with OTU counts
+  dplyr::inner_join(., b.otu.tbl, by = "OTU") %>% 
+  # Convert to wide format
+  tidyr::spread(TAXONOMIC.RANK, CLEAN.TAXONOMIC.CLASSIFICATION) %>% 
+  # Group
+  dplyr::group_by(GROUP, PHYLUM) %>% 
+  # Calculate order counts
+  dplyr::summarise(COUNT = sum(COUNT)) %>% 
+  # Ungroup
+  dplyr::ungroup()
+
+# Hellinger transform phylum abundances
+b.phylum.h.tbl <- b.phylum.tbl %>% 
+  # Add experimental design
+  dplyr::inner_join(exp.tbl, ., by = "GROUP") %>% 
+  # Group by PLOT
+  dplyr::group_by(PLOT) %>% 
+  # Hellinger transform each OTU
+  dplyr::mutate(HELLINGER = sqrt(COUNT / sum(COUNT))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Calculate total sum
+  dplyr::mutate(TOTAL.COUNT = sum(COUNT)) %>% 
+  # Group
+  dplyr::group_by(PHYLUM) %>% 
+  # Calculate total percentage
+  dplyr::mutate(TOTAL.PERC = (100 * (sum(COUNT) * (1 / TOTAL.COUNT)))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Get Actinobacteria
+  dplyr::filter(PHYLUM == "Actinobacteria") %>% 
+  # Select relevant columns
+  dplyr::select(PLOT, SITE, TREATMENT, PHYLUM, HELLINGER) %>% 
+  # Convert to wide format
+  tidyr::spread(PHYLUM, HELLINGER)
+
+# Convert to data frame
+b.phylum.h.df <- as.data.frame(b.phylum.h.tbl)
+# Add row names
+row.names(b.phylum.h.df) <- b.phylum.h.df$PLOT
+# ANOVA
+b.phylum.h.aov <- aov(as.matrix(b.phylum.h.df[4]) ~ SITE * TREATMENT, data = b.phylum.h.df)
+# Get summary
+b.phylum.h.aov.summary <- summary.aov(b.phylum.h.aov)
+
+# Fisher's lsd, Actinobacteria
+b.phylum.h.lsd <- LSD.test(aov(cbind(as.matrix(b.phylum.h.df[4])) ~ SITE * TREATMENT, data = b.phylum.h.df), c("SITE", "TREATMENT"), alpha = 0.05, p.adj = "none")
+```
+
+ANOVA results are shown below:  
+
+```{r actino_display_anova, echo = FALSE}
+# Display output
+b.phylum.h.aov.summary
+```
+
+### 5. Actinobacteria percent change  
+
+The percent change in Actinobacterial abundance between ambient N deposition and experimental N deposition treatments was calculated as follows:  
+
+```{r actinobacteria_percent_change}
+# Calculate percent change Actinobacteria
+b.phylum.perc.change.tbl <- b.phylum.tbl %>% 
+  # Add experimental design
+  dplyr::inner_join(exp.tbl, ., by = "GROUP") %>% 
+  # Group by GROUP
+  dplyr::group_by(GROUP) %>% 
+  # Calculate percentages
+  dplyr::mutate(PERC = 100 * (COUNT / sum(COUNT))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Calculate total sum
+  dplyr::mutate(TOTAL.COUNT = sum(COUNT)) %>% 
+  # Group
+  dplyr::group_by(PHYLUM) %>% 
+  # Calculate total percentage
+  dplyr::mutate(TOTAL.PERC = (100 * (sum(COUNT) * (1 / TOTAL.COUNT)))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Select Actinobacteria
+  dplyr::filter(PHYLUM == "Actinobacteria") %>% 
+  # Select relevant columns
+  dplyr::select(PLOT, SITE, TREATMENT, PHYLUM, PERC) %>% 
+  # Group
+  dplyr::group_by(PHYLUM, TREATMENT) %>% 
+  # Calculate mean and SE
+  dplyr::summarise(MEAN.PERC = mean(PERC), 
+                   SE.PERC = se(PERC)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Convert to long format
+  tidyr::gather(PARAMETER, PERC, -PHYLUM, -TREATMENT) %>% 
+  # Create new parameter column
+  tidyr::unite(PARAMETER, TREATMENT, PARAMETER, sep = "_") %>% 
+  # Convert to wide format
+  tidyr::spread(PARAMETER, PERC) %>% 
+  # Calculate percent change
+  dplyr::mutate(PERC.CHANGE = 100 * ((Ndep_MEAN.PERC - Amb_MEAN.PERC) * (1 / Amb_MEAN.PERC)))
+
+# Calculate abundances as percentages
+b.phylum.perc.tbl <- b.phylum.tbl %>% 
+  # Add experimental design
+  dplyr::inner_join(exp.tbl, ., by = "GROUP") %>% 
+  # Group by PLOT
+  dplyr::group_by(PLOT) %>% 
+  # Calculate percentages
+  dplyr::mutate(PERC = 100 * (COUNT / sum(COUNT))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Calculate total sum
+  dplyr::mutate(TOTAL.COUNT = sum(COUNT)) %>% 
+  # Group
+  dplyr::group_by(PHYLUM) %>% 
+  # Calculate total percentage
+  dplyr::mutate(TOTAL.PERC = (100 * (sum(COUNT) * (1 / TOTAL.COUNT)))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Select Actinobacteria
+  dplyr::filter(PHYLUM == "Actinobacteria") %>% 
+  # Select relevant columns
+  dplyr::select(PLOT, SITE, TREATMENT, PHYLUM, PERC) %>% 
+  # Group
+  dplyr::group_by(PHYLUM, TREATMENT) %>% 
+  # Calculate mean and SE
+  dplyr::summarise(MEAN.PERC = mean(PERC), 
+                   SE.PERC = se(PERC)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Calculate error bar limits
+  dplyr::mutate(ERROR.BAR.MAX = MEAN.PERC + SE.PERC, 
+                ERROR.BAR.MIN = MEAN.PERC - SE.PERC) %>% 
+  # Add bottom error bar color
+  dplyr::mutate(ERROR.BAR.COLOR = ifelse(TREATMENT == "Amb", "black", "white")) %>% 
+  # Add significance label
+  dplyr::mutate(SIG.LABEL = c("", "**"))
+
+# Get percent phylum table, site by treatment
+b.phylum.perc.site.tbl <- b.phylum.tbl %>% 
+  # Add experimental design
+  dplyr::inner_join(exp.tbl, ., by = "GROUP") %>% 
+  # Group by PLOT
+  dplyr::group_by(PLOT) %>% 
+  # Calculate percentages
+  dplyr::mutate(PERC = 100 * (COUNT / sum(COUNT))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Calculate total sum
+  dplyr::mutate(TOTAL.COUNT = sum(COUNT)) %>% 
+  # Group
+  dplyr::group_by(PHYLUM) %>% 
+  # Calculate total percentage
+  dplyr::mutate(TOTAL.PERC = (100 * (sum(COUNT) * (1 / TOTAL.COUNT)))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Select Actinobacteria
+  dplyr::filter(PHYLUM == "Actinobacteria") %>% 
+  # Select relevant columns
+  dplyr::select(PLOT, SITE, TREATMENT, PHYLUM, PERC) %>% 
+  # Group
+  dplyr::group_by(PHYLUM, SITE, TREATMENT) %>% 
+  # Calculate mean and SE
+  dplyr::summarise(MEAN.PERC = mean(PERC), 
+                   SE.PERC = se(PERC)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Calculate error bar limits
+  dplyr::mutate(ERROR.BAR.MAX = MEAN.PERC + SE.PERC, 
+                ERROR.BAR.MIN = MEAN.PERC - SE.PERC) %>% 
+  # Add bottom error bar color
+  dplyr::mutate(ERROR.BAR.COLOR = ifelse(TREATMENT == "Amb", "black", "white"))
+```
+
+Experimental N deposition increased the relative abundance of Actinobacteria `r round(b.phylum.perc.change.tbl$PERC.CHANGE[1], 0)`%.  
+
+### 6. Construct Actinobacteria bar plots  
+
+The following code creates bar plots that will later be used to construct **Figure S2**:  
+
+```{r actinobacteria_bar_plots}
+# Bacteria figure
+b.phylum.fig <- ggplot(b.phylum.perc.tbl, aes(x = PHYLUM, y = MEAN.PERC, fill = TREATMENT)) + 
+  # Specify boxplot
+  geom_bar(stat = "identity", 
+           colour = "black", 
+           position = position_dodge(0.9)) + 
+  geom_errorbar(aes(ymax = MEAN.PERC, ymin = ERROR.BAR.MIN, colour = ERROR.BAR.COLOR), 
+                position = position_dodge(0.9), 
+                width = 0) + 
+  scale_color_identity() + 
+  geom_errorbar(aes(ymax = ERROR.BAR.MAX, ymin = MEAN.PERC), 
+                position = position_dodge(0.9), 
+                width = 0, 
+                colour = "black") + 
+  scale_y_continuous(expand = c(0, 0), 
+                     limits = c(0, 14),
+                     breaks = c(0, 7, 14), 
+                     labels = c("0%", "7%", "14%")) + 
+  # Update labels on treatment/time legend
+  scale_fill_manual(values = c("white", "black"), 
+                    labels = c("  Ambient N  ", "  Experimental N")) + 
+  guides(title = NULL) + 
+  # Add x axis label
+  labs(title = "Actinobacteria", 
+       x = NULL, 
+       # Add y axis label
+       y = NULL) + 
+  # Format plot
+  theme(legend.title = element_blank(), 
+        # Remove panel and legend backgrounds
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        legend.key = element_blank(), 
+        # Add axis lines
+        axis.line.x = element_line(colour = "black", size = 0.6),
+        axis.line.y = element_line(colour = "black", size = 0.6), 
+        # Format text
+        plot.title = element_text(colour = "black", size = 10, face = "bold", hjust = 0.5), 
+        axis.title.y = element_text(colour = "black", size = 14, face = "bold"), 
+        axis.text.x = element_blank(), 
+        axis.ticks.x = element_blank(), 
+        axis.ticks.y = element_line(colour = "black", size = 0.6), 
+        axis.text.y = element_text(colour = "black", size = 8, face = "bold"), 
+        legend.text = element_text(colour = "black", size = 8, face = "bold")) + 
+  geom_text(aes(label = SIG.LABEL, y = ERROR.BAR.MAX + 0.5), 
+            stat = "identity", 
+            position = position_dodge(0.9), 
+            size = 6)
+
+# Bacteria phylum figure, site by treatment
+b.phylum.site.fig <- ggplot(b.phylum.perc.site.tbl, aes(x = SITE, y = MEAN.PERC, fill = TREATMENT)) + 
+  # Specify boxplot
+  geom_bar(stat = "identity", 
+           colour = "black", 
+           position = position_dodge(0.9)) + 
+  geom_errorbar(aes(ymax = MEAN.PERC, ymin = ERROR.BAR.MIN, colour = ERROR.BAR.COLOR), 
+                position = position_dodge(0.9), 
+                width = 0) + 
+  scale_color_identity() + 
+  geom_errorbar(aes(ymax = ERROR.BAR.MAX, ymin = MEAN.PERC), 
+                position = position_dodge(0.9), 
+                width = 0, 
+                colour = "black") + 
+  scale_y_continuous(expand = c(0, 0), 
+                     limits = c(0, 14),
+                     breaks = c(0, 7, 14), 
+                     labels = c("0%", "7%", "14%")) + 
+  scale_x_discrete(breaks = waiver(), 
+                   labels = c("Site A", "Site B", "Site C", "Site D")) + 
+  # Update labels on treatment/time legend
+  scale_fill_manual(values = c("white", "black"), 
+                    labels = c("  Ambient N  ", "  Experimental N")) + 
+  guides(title = NULL) + 
+  # Add x axis label
+  labs(title = "Actinobacteria", 
+       x = NULL, 
+       # Add y axis label
+       y = NULL) + 
+  # Format plot
+  theme(legend.title = element_blank(), 
+        # Remove panel and legend backgrounds
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        legend.key = element_blank(), 
+        # Add axis lines
+        axis.line.x = element_line(colour = "black", size = 0.6),
+        axis.line.y = element_line(colour = "black", size = 0.6), 
+        # Format text
+        plot.title = element_text(colour = "black", size = 10, face = "bold", hjust = 0.5), 
+        axis.title.y = element_text(colour = "black", size = 14, face = "bold"), 
+        axis.text.x = element_text(colour = "black", size = 8, face = "bold", angle = 45, hjust = 1), 
+        axis.ticks.x = element_blank(), 
+        axis.ticks.y = element_line(colour = "black", size = 0.6), 
+        axis.text.y = element_text(colour = "black", size = 8, face = "bold"), 
+        legend.text = element_text(colour = "black", size = 8, face = "bold")) + 
+  annotate("text", 
+           x = c(0.725, 1.225, 1.725, 2.225, 2.725, 3.225, 3.725, 4.225), 
+           y = b.phylum.perc.site.tbl$ERROR.BAR.MAX + 0.5, 
+           label = c("", "", "", "**", "", "", "", ""), 
+           size = 5)
+```
+
+### 7. Create **Figure S2**  
+
+The following code creates **Figure S2**:  
+
+```{r create_agaricomycetes_actinobacteria_bar_plot, results = "hide", message = FALSE}
+# Combine plots into one figure
+phylum.class.supplemental.barplot <- ggarrange(f.class.fig, b.phylum.fig, 
+                                               b.phylum.site.fig, 
+                                               ncol = 3, nrow = 1, 
+                                               common.legend = TRUE,  
+                                               align = "hv", 
+                                               legend = "bottom")
+
+# Add y title
+phylum.class.supplemental.final.barplot <- annotate_figure(phylum.class.supplemental.barplot, 
+                                                           left = text_grob("Relative abundance\n", 
+                                                                            color = "black", 
+                                                                            rot = 90, 
+                                                                            size = 18, 
+                                                                            face = "bold", 
+                                                                            hjust = 0.38))
+
+# Save image by uncommenting the following code
+#ggsave("Figure_S2.png", phylum.class.supplemental.final.barplot, device = "png", width = 7, height = 3.94, units = "in", dpi = 300)
+```
+
+**Figure S2** is displayed below:  
+
+```{r display_agaric_actino_bar_plot, echo = FALSE, fig.width = 7, fig.height = 3.93, fig.align = "center"}
+# Display bar plot
+phylum.class.supplemental.final.barplot
+```
+
+## B. Fungal orders  
+
+The following set of analyses determines the effect of experimental N deposition on the relative abundances of select fungal orders.  
+
+### 1. Order ANOVA  
+
+This code runs a two-way ANOVA to determine the effect of experimental N deposition on select fungal orders. ANOVA tests were only run considered for taxa that responded with a percent change of >20% and a total abundance of >1%  
+
+```{r fungal_orders_anova, message = FALSE, results = "hide"}
+# Format fungal taxonomy and get order counts by group
+f.order.tbl <- as_tibble(fread("Gradient.28S.Roots.combined.trim.unique.pick.good.filter.unique.precluster.pick.pick.opti_mcc.0.01.cons.taxonomy", sep = "\t", header = TRUE)) %>% 
+  # Rename columns
+  dplyr::rename(SIZE = Size, TAXONOMY = Taxonomy) %>% 
+  # Remove SIZE column
+  dplyr::select(-SIZE) %>% 
+  # Separate taxonomic ranks
+  tidyr::separate(TAXONOMY, c("ROOT", "KINGDOM", "PHYLUM", "CLASS", "ORDER", "FAMILY", "GENUS"), ";") %>% 
+  # Convert to long format
+  tidyr::gather(TAXONOMIC.RANK, TAXONOMIC.CLASSIFICATION, -OTU) %>% 
+  # Clean up taxonomy
+  dplyr::mutate(CLEAN.TAXONOMIC.CLASSIFICATION = gsub("\\(\\d.*", "", TAXONOMIC.CLASSIFICATION)) %>% 
+  # Drop old taxonomy
+  dplyr::select(-TAXONOMIC.CLASSIFICATION) %>% 
+  # Merge with OTU counts
+  dplyr::inner_join(., f.otu.tbl, by = "OTU") %>% 
+  # Convert to wide format
+  tidyr::spread(TAXONOMIC.RANK, CLEAN.TAXONOMIC.CLASSIFICATION) %>% 
+  # Group
+  dplyr::group_by(GROUP, PHYLUM, CLASS, ORDER) %>% 
+  # Calculate order counts
+  dplyr::summarise(COUNT = sum(COUNT)) %>% 
+  # Ungroup
+  dplyr::ungroup()
+
+# Hellinger transform order abundances
+f.order.h.tbl <- f.order.tbl %>% 
+  # Add order ID column
+  tidyr::unite(ORDER.ID, PHYLUM, CLASS, ORDER, sep = ".", remove = FALSE) %>% 
+  # Replace spaces with underscores
+  dplyr::mutate(ORDER.ID = gsub(" ", "_", ORDER.ID)) %>% 
+  # Add experimental design
+  dplyr::inner_join(exp.tbl, ., by = "GROUP") %>% 
+  # Group by PLOT
+  dplyr::group_by(PLOT) %>% 
+  # Hellinger transform each OTU
+  dplyr::mutate(HELLINGER = sqrt(COUNT / sum(COUNT))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Calculate total sum
+  dplyr::mutate(TOTAL.COUNT = sum(COUNT)) %>% 
+  # Group
+  dplyr::group_by(PHYLUM, CLASS, ORDER) %>% 
+  # Calculate total percentage
+  dplyr::mutate(TOTAL.PERC = (100 * (sum(COUNT) * (1 / TOTAL.COUNT)))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Drop low abundance orders
+  dplyr::filter(TOTAL.PERC >= 1) %>% 
+  # Select relevant columns
+  dplyr::select(PLOT, SITE, TREATMENT, ORDER.ID, HELLINGER) %>% 
+  # Convert to wide format
+  tidyr::spread(ORDER.ID, HELLINGER)
+
+# Convert to data frame
+f.order.h.df <- as.data.frame(f.order.h.tbl)
+# Add row names
+row.names(f.order.h.df) <- f.order.h.df$PLOT
+# ANOVA
+f.order.h.aov <- manova(cbind(as.matrix(f.order.h.df[4 : ncol(f.order.h.df)])) ~ SITE * TREATMENT, data = f.order.h.df)
+# Get summary
+f.order.h.aov.summary <- summary.aov(f.order.h.aov)
+
+# Write function to clean ANOVA summary list names
+clean_anova_names <- function(aa) {
+  # Get name
+  tmp1 <- gsub(" Response ", "", aa)
+  
+  # Return results
+  return(tmp1)
+}
+
+# Fisher's lsd Hypocreales
+f.hypo.h.lsd <- LSD.test(aov(cbind(as.matrix(f.order.h.df[8])) ~ SITE * TREATMENT, data = f.order.h.df), c("SITE", "TREATMENT"), alpha = 0.05, p.adj = "none")
+
+# Fisher's lsd Tremellales
+f.trem.h.lsd <- LSD.test(aov(cbind(as.matrix(f.order.h.df[17])) ~ SITE * TREATMENT, data = f.order.h.df), c("SITE", "TREATMENT"), alpha = 0.05, p.adj = "none")
+
+# Format ANOVA results
+names(f.order.h.aov.summary) <- sapply(names(f.order.h.aov.summary), clean_anova_names)
+# Collapse into tibble
+f.order.h.aov.summary.tbl <- as_tibble(do.call(rbind, f.order.h.aov.summary), rownames = "ORDER.ID") %>% 
+  # Rename columns
+  dplyr::rename(DF = Df, 
+                SUM.SQ = "Sum Sq", 
+                MEAN.SQ = "Mean Sq", 
+                F.VAL = "F value", 
+                P.VAL = "Pr(>F)") %>% 
+  # Split the ID column
+  tidyr::separate(ORDER.ID, c("PHYLUM", "CLASS", "ORDER", "COMPARISON"), "\\.") %>% 
+  # Recreate ORDER ID
+  tidyr::unite(ORDER.ID, PHYLUM, CLASS, ORDER, sep = ".") %>% 
+  # Trim whitespace
+  dplyr::mutate(COMPARISON = trimws(COMPARISON)) %>% 
+  # Select only necessary columns
+  dplyr::select(ORDER.ID, COMPARISON, P.VAL) %>% 
+  # Remove residuals
+  dplyr::filter(COMPARISON != "Residuals") %>% 
+  # Convert to wide format
+  tidyr::spread(COMPARISON, P.VAL) %>% 
+  # Rename columns
+  dplyr::rename(SITE.P = SITE, 
+                SITE.TREATMENT.P = 'SITE:TREATMENT', 
+                TREATMENT.P = TREATMENT)
+```
+
+### 2. Fungal orders percent change  
+
+The percent change in the relative abundance of select fungal orders is calculated below.  
+
+```{r fungal_order_percent_change}
+# Calculate percent change
+f.order.perc.change.tbl <- f.order.tbl %>% 
+  # Add order ID column
+  tidyr::unite(ORDER.ID, PHYLUM, CLASS, ORDER, sep = ".", remove = FALSE) %>% 
+  # Replace spaces with underscores
+  dplyr::mutate(ORDER.ID = gsub(" ", "_", ORDER.ID)) %>% 
+  # Add experimental design
+  dplyr::inner_join(exp.tbl, ., by = "GROUP") %>% 
+  # Group by PLOT
+  dplyr::group_by(PLOT) %>% 
+  # Calculate percentages
+  dplyr::mutate(PERC = 100 * (COUNT / sum(COUNT))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Calculate total sum
+  dplyr::mutate(TOTAL.COUNT = sum(COUNT)) %>% 
+  # Group
+  dplyr::group_by(ORDER.ID) %>% 
+  # Calculate total percentage
+  dplyr::mutate(TOTAL.PERC = (100 * (sum(COUNT) * (1 / TOTAL.COUNT)))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Drop low abundance orders
+  dplyr::filter(TOTAL.PERC >= 1) %>% 
+  # Select relevant columns
+  dplyr::select(PLOT, SITE, TREATMENT, ORDER.ID, PERC) %>% 
+  # Group
+  dplyr::group_by(ORDER.ID, TREATMENT) %>% 
+  # Calculate mean and SE
+  dplyr::summarise(MEAN.PERC = mean(PERC), 
+                   SE.PERC = se(PERC)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Convert to long format
+  tidyr::gather(PARAMETER, PERC, -ORDER.ID, -TREATMENT) %>% 
+  # Create new parameter column
+  tidyr::unite(PARAMETER, TREATMENT, PARAMETER, sep = "_") %>% 
+  # Convert to wide format
+  tidyr::spread(PARAMETER, PERC) %>% 
+  # Calculate percent change
+  dplyr::mutate(PERC.CHANGE = 100 * ((Ndep_MEAN.PERC - Amb_MEAN.PERC) * (1 / Amb_MEAN.PERC))) %>% 
+  # Select only orders with |% change| >= 20%
+  dplyr::filter(abs(PERC.CHANGE) >= 20) %>% 
+  # Join with ANOVA results
+  dplyr::inner_join(., f.order.h.aov.summary.tbl, by = "ORDER.ID") %>% 
+  # Separate ORDER.ID column
+  tidyr::separate(ORDER.ID, c("PHYLUM", "CLASS", "ORDER"), sep = "\\.") %>% 
+  # Drop unnecessary columns
+  dplyr::select(PHYLUM, CLASS, ORDER, PERC.CHANGE, SITE.P, TREATMENT.P, SITE.TREATMENT.P) %>% 
+  # Sort
+  dplyr::arrange(ORDER)
+
+# Calculate abundances as percentages
+f.order.perc.tbl <- f.order.tbl %>% 
+  # Add order ID column
+  tidyr::unite(ORDER.ID, PHYLUM, CLASS, ORDER, sep = ".", remove = FALSE) %>% 
+  # Replace spaces with underscores
+  dplyr::mutate(ORDER.ID = gsub(" ", "_", ORDER.ID)) %>% 
+  # Add experimental design
+  dplyr::inner_join(exp.tbl, ., by = "GROUP") %>% 
+  # Group by PLOT
+  dplyr::group_by(PLOT) %>% 
+  # Calculate percentages
+  dplyr::mutate(PERC = 100 * (COUNT / sum(COUNT))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Calculate total sum
+  dplyr::mutate(TOTAL.COUNT = sum(COUNT)) %>% 
+  # Group
+  dplyr::group_by(PHYLUM, CLASS, ORDER) %>% 
+  # Calculate total percentage
+  dplyr::mutate(TOTAL.PERC = (100 * (sum(COUNT) * (1 / TOTAL.COUNT)))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Drop low abundance orders
+  dplyr::filter(TOTAL.PERC >= 1) %>% 
+  # Select relevant columns
+  dplyr::select(PLOT, SITE, TREATMENT, ORDER.ID, PERC) %>% 
+  # Group
+  dplyr::group_by(ORDER.ID, TREATMENT) %>% 
+  # Calculate mean and SE
+  dplyr::summarise(MEAN.PERC = mean(PERC), 
+                   SE.PERC = se(PERC)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Convert to long format
+  tidyr::gather(PARAMETER, PERC, -ORDER.ID, -TREATMENT) %>% 
+  # Create new parameter column
+  tidyr::unite(PARAMETER, TREATMENT, PARAMETER, sep = "_") %>% 
+  # Convert to wide format
+  tidyr::spread(PARAMETER, PERC) %>% 
+  # Calculate percent change
+  dplyr::mutate(PERC.CHANGE = 100 * ((Ndep_MEAN.PERC - Amb_MEAN.PERC) * (1 / Amb_MEAN.PERC))) %>% 
+  # Select only orders with |% change| >= 20%
+  dplyr::filter(abs(PERC.CHANGE) >= 20) %>% 
+  # Drop unnecessary columns
+  dplyr::select(-PERC.CHANGE) %>% 
+  # Convert to wide format
+  tidyr::gather(PARAMETER, PERC, -ORDER.ID) %>% 
+  # Separate parameter column
+  tidyr::separate(PARAMETER, c("TREATMENT", "PARAMETER"), sep = "\\_") %>% 
+  # Convert to wide format
+  tidyr::spread(PARAMETER, PERC) %>% 
+  # Join with ANOVA results
+  dplyr::inner_join(., f.order.h.aov.summary.tbl, by = "ORDER.ID") %>% 
+  # Drop non-significant taxa
+  dplyr::filter(TREATMENT.P < 0.1) %>% 
+  # Separate ORDER.ID column
+  tidyr::separate(ORDER.ID, c("PHYLUM", "CLASS", "ORDER"), sep = "\\.") %>% 
+  # Calculate error bar limits
+  dplyr::mutate(ERROR.BAR.MAX = MEAN.PERC + SE.PERC, 
+                ERROR.BAR.MIN = MEAN.PERC - SE.PERC) %>% 
+  # Add bottom error bar color
+  dplyr::mutate(ERROR.BAR.COLOR = ifelse(TREATMENT == "Amb", "black", "white")) %>% 
+  # Add significance label
+  dplyr::mutate(SIG.LABEL = ifelse(TREATMENT == "Ndep" & TREATMENT.P < 0.1 & TREATMENT.P >= 0.05, "*", ""), 
+                SIG.LABEL = ifelse(TREATMENT == "Ndep" & TREATMENT.P < 0.05, "**", SIG.LABEL))
+```
+
+### 3. Fungal supplemental order bar plots  
+
+This code creates bar plots for select fungal orders that were used to create **Figure S3**.  
+
+```{r order_perc_change}
+# Get percent order table for Tremellales
+f.order.perc.trem.tbl <- f.order.tbl %>% 
+  # Add order ID column
+  tidyr::unite(ORDER.ID, PHYLUM, CLASS, ORDER, sep = ".", remove = FALSE) %>% 
+  # Replace spaces with underscores
+  dplyr::mutate(ORDER.ID = gsub(" ", "_", ORDER.ID)) %>% 
+  # Add experimental design
+  dplyr::inner_join(exp.tbl, ., by = "GROUP") %>% 
+  # Group by GROUP
+  dplyr::group_by(GROUP) %>% 
+  # Calculate percentages
+  dplyr::mutate(PERC = 100 * (COUNT / sum(COUNT))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Calculate total sum
+  dplyr::mutate(TOTAL.COUNT = sum(COUNT)) %>% 
+  # Group
+  dplyr::group_by(PHYLUM, CLASS, ORDER) %>% 
+  # Calculate total percentage
+  dplyr::mutate(TOTAL.PERC = (100 * (sum(COUNT) * (1 / TOTAL.COUNT)))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Select Thelephorales
+  dplyr::filter(ORDER == "Tremellales") %>% 
+  # Select relevant columns
+  dplyr::select(GROUP, PLOT, SITE, TREATMENT, ORDER.ID, PERC) %>% 
+  # Group
+  dplyr::group_by(ORDER.ID, SITE, TREATMENT) %>% 
+  # Calculate mean and SE
+  dplyr::summarise(MEAN.PERC = mean(PERC), 
+                   SE.PERC = se(PERC)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Separate ORDER.ID column
+  tidyr::separate(ORDER.ID, c("PHYLUM", "CLASS", "ORDER"), sep = "\\.") %>% 
+  # Calculate error bar limits
+  dplyr::mutate(ERROR.BAR.MAX = MEAN.PERC + SE.PERC, 
+                ERROR.BAR.MIN = MEAN.PERC - SE.PERC) %>% 
+  # Add bottom error bar color
+  dplyr::mutate(ERROR.BAR.COLOR = ifelse(TREATMENT == "Amb", "black", "white"))
+
+# Tremallales figure
+f.trem.site.fig <- ggplot(f.order.perc.trem.tbl, aes(x = SITE, y = MEAN.PERC, fill = TREATMENT)) + 
+  # Specify boxplot
+  geom_bar(stat = "identity", 
+           colour = "black", 
+           position = position_dodge(0.9)) + 
+  geom_errorbar(aes(ymax = MEAN.PERC, ymin = ERROR.BAR.MIN, colour = ERROR.BAR.COLOR), 
+                position = position_dodge(0.9), 
+                width = 0) + 
+  scale_color_identity() + 
+  geom_errorbar(aes(ymax = ERROR.BAR.MAX, ymin = MEAN.PERC), 
+                position = position_dodge(0.9), 
+                width = 0, 
+                colour = "black") + 
+  scale_y_continuous(expand = c(0, 0), 
+                     limits = c(0, 35),
+                     breaks = c(0, 5, 10, 15, 20, 25, 30, 35), 
+                     labels = c("0%", "5%", "10%", "15%", "20%", "25%", "30%", "35%")) + 
+  scale_x_discrete(breaks = waiver(), 
+                   labels = c("Site A", "Site B", "Site C", "Site D")) + 
+  # Update labels on treatment/time legend
+  scale_fill_manual(values = c("white", "black"), 
+                    labels = c("  Ambient N  ", "  Experimental N")) + 
+  guides(title = NULL) + 
+  # Add x axis label
+  labs(title = "Tremellales", 
+       x = NULL, 
+       # Add y axis label
+       y = NULL) + 
+  # Format plot
+  theme(legend.title = element_blank(), 
+        # Remove panel and legend backgrounds
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        legend.key = element_blank(), 
+        # Add axis lines
+        axis.line.x = element_line(colour = "black", size = 0.6),
+        axis.line.y = element_line(colour = "black", size = 0.6), 
+        # Format text
+        plot.title = element_text(colour = "black", size = 10, face = "bold", hjust = 0.5), 
+        axis.title.y = element_text(colour = "black", size = 14, face = "bold"), 
+        axis.text.x = element_text(colour = "black", size = 8, face = "bold", angle = 45, hjust = 1), 
+        axis.ticks.x = element_blank(), 
+        axis.ticks.y = element_line(colour = "black", size = 0.6), 
+        axis.text.y = element_text(colour = "black", size = 8, face = "bold"), 
+        legend.text = element_text(colour = "black", size = 8, face = "bold")) + 
+annotate("text", 
+         x = c(0.725, 1.225, 1.725, 2.225, 2.725, 3.225, 3.725, 4.225), 
+         y = f.order.perc.trem.tbl$ERROR.BAR.MAX + 1, 
+         label = c("", "", "", "**", "", "*", "", ""), 
+         size = 5)
+
+# Get percent order table for Hypocreales
+f.order.perc.hypo.tbl <- f.order.tbl %>% 
+  # Add order ID column
+  tidyr::unite(ORDER.ID, PHYLUM, CLASS, ORDER, sep = ".", remove = FALSE) %>% 
+  # Replace spaces with underscores
+  dplyr::mutate(ORDER.ID = gsub(" ", "_", ORDER.ID)) %>% 
+  # Add experimental design
+  dplyr::inner_join(exp.tbl, ., by = "GROUP") %>% 
+  # Group by GROUP
+  dplyr::group_by(GROUP) %>% 
+  # Calculate percentages
+  dplyr::mutate(PERC = 100 * (COUNT / sum(COUNT))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Calculate total sum
+  dplyr::mutate(TOTAL.COUNT = sum(COUNT)) %>% 
+  # Group
+  dplyr::group_by(PHYLUM, CLASS, ORDER) %>% 
+  # Calculate total percentage
+  dplyr::mutate(TOTAL.PERC = (100 * (sum(COUNT) * (1 / TOTAL.COUNT)))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Select Thelephorales
+  dplyr::filter(ORDER == "Hypocreales") %>% 
+  # Select relevant columns
+  dplyr::select(GROUP, PLOT, SITE, TREATMENT, ORDER.ID, PERC) %>% 
+  # Group
+  dplyr::group_by(ORDER.ID, SITE, TREATMENT) %>% 
+  # Calculate mean and SE
+  dplyr::summarise(MEAN.PERC = mean(PERC), 
+                   SE.PERC = se(PERC)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Separate ORDER.ID column
+  tidyr::separate(ORDER.ID, c("PHYLUM", "CLASS", "ORDER"), sep = "\\.") %>% 
+  # Calculate error bar limits
+  dplyr::mutate(ERROR.BAR.MAX = MEAN.PERC + SE.PERC, 
+                ERROR.BAR.MIN = MEAN.PERC - SE.PERC) %>% 
+  # Add bottom error bar color
+  dplyr::mutate(ERROR.BAR.COLOR = ifelse(TREATMENT == "Amb", "black", "white"))
+
+# Hypocreales figure
+f.hypo.site.fig <- ggplot(f.order.perc.hypo.tbl, aes(x = SITE, y = MEAN.PERC, fill = TREATMENT)) + 
+  # Specify boxplot
+  geom_bar(stat = "identity", 
+           colour = "black", 
+           position = position_dodge(0.9)) + 
+  geom_errorbar(aes(ymax = MEAN.PERC, ymin = ERROR.BAR.MIN, colour = ERROR.BAR.COLOR), 
+                position = position_dodge(0.9), 
+                width = 0) + 
+  scale_color_identity() + 
+  geom_errorbar(aes(ymax = ERROR.BAR.MAX, ymin = MEAN.PERC), 
+                position = position_dodge(0.9), 
+                width = 0, 
+                colour = "black") + 
+  scale_y_continuous(expand = c(0, 0), 
+                     limits = c(0, 8),
+                     breaks = c(0, 2, 4, 6, 8), 
+                     labels = c("0%", "2%", "4%", "6%", "8%")) + 
+  scale_x_discrete(breaks = waiver(), 
+                   labels = c("Site A", "Site B", "Site C", "Site D")) + 
+  # Update labels on treatment/time legend
+  scale_fill_manual(values = c("white", "black"), 
+                    labels = c("  Ambient N  ", "  Experimental N")) + 
+  guides(title = NULL) + 
+  # Add x axis label
+  labs(title = "Hypocreales", 
+       x = NULL, 
+       # Add y axis label
+       y = NULL) + 
+  # Format plot
+  theme(legend.title = element_blank(), 
+        # Remove panel and legend backgrounds
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        legend.key = element_blank(), 
+        # Add axis lines
+        axis.line.x = element_line(colour = "black", size = 0.6),
+        axis.line.y = element_line(colour = "black", size = 0.6), 
+        # Format text
+        plot.title = element_text(colour = "black", size = 10, face = "bold", hjust = 0.5), 
+        axis.title.y = element_text(colour = "black", size = 14, face = "bold"), 
+        axis.text.x = element_text(colour = "black", size = 8, face = "bold", angle = 45, hjust = 1), 
+        axis.ticks.x = element_blank(), 
+        axis.ticks.y = element_line(colour = "black", size = 0.6), 
+        axis.text.y = element_text(colour = "black", size = 8, face = "bold"), 
+        legend.text = element_text(colour = "black", size = 8, face = "bold")) + 
+annotate("text", 
+         x = c(0.725, 1.225, 1.725, 2.225, 2.725, 3.225, 3.725, 4.225), 
+         y = f.order.perc.hypo.tbl$ERROR.BAR.MAX + 1, 
+         label = c("", "", "", "", "", "**", "", ""), 
+         size = 5)
+```
+
+### 4. Create fungal order bar plots  
+
+The following code creates fungal order bar plots used to construct **Figure 2**.  
+
+```{r fungal_order_bar_plots}
+# Fungi figure
+f.order.fig <- ggplot(f.order.perc.tbl, aes(x = ORDER, y = MEAN.PERC, fill = TREATMENT)) + 
+  # Specify boxplot
+  geom_bar(stat = "identity", 
+           colour = "black", 
+           position = position_dodge(0.9)) + 
+  geom_errorbar(aes(ymax = MEAN.PERC, ymin = ERROR.BAR.MIN, colour = ERROR.BAR.COLOR), 
+                position = position_dodge(0.9), 
+                width = 0) + 
+  scale_color_identity() + 
+  geom_errorbar(aes(ymax = ERROR.BAR.MAX, ymin = MEAN.PERC), 
+                position = position_dodge(0.9), 
+                width = 0, 
+                colour = "black") + 
+  scale_y_continuous(expand = c(0, 0), 
+                     limits = c(0, 50),
+                     breaks = c(0, 10, 20, 30, 40, 50), 
+                     labels = c("0%", "10%", "20%", "30%", "40%", "50%")) + 
+  # Update labels on treatment/time legend
+  scale_fill_manual(values = c("white", "black"), 
+                    labels = c("  Ambient N  ", "  Experimental N")) + 
+  guides(title = NULL) + 
+  # Add x axis label
+  labs(title = "Fungal orders", 
+       x = NULL, 
+       # Add y axis label
+       y = NULL) + 
+  # Format plot
+  theme(legend.title = element_blank(), 
+        # Remove panel and legend backgrounds
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        legend.key = element_blank(), 
+        # Add axis lines
+        axis.line.x = element_line(colour = "black", size = 0.6),
+        axis.line.y = element_line(colour = "black", size = 0.6), 
+        # Format text
+        plot.title = element_text(colour = "black", size = 14, face = "bold", hjust = 0.5), 
+        axis.title.y = element_text(colour = "black", size = 14, face = "bold"), 
+        axis.text.x = element_text(colour = "black", size = 10, face = "bold", angle = 45, hjust = 1), 
+        axis.ticks.x = element_blank(), 
+        axis.ticks.y = element_line(colour = "black", size = 0.6), 
+        axis.text.y = element_text(colour = "black", size = 10, face = "bold"), 
+        legend.text = element_text(colour = "black", size = 10, face = "bold")) + 
+  geom_text(aes(label = SIG.LABEL, y = f.order.perc.tbl$MEAN.PERC + 15), 
+            stat = "identity", 
+            size = 6)
+```
+
+## C. Bacterial families  
+
+The following set of analyses assess the effects of experimental N deposition on the relative abundances of select bacterial families.  
+
+### 1. Family ANOVA  
+
+The following code determines the effects of experimental N deposition on select bacterial families using two-way ANOVA.  
+
+```{r bacterial_families_anova, results = "hide", message = FALSE}
+# Format bacterial taxonomy and get family counts by group
+b.family.tbl <- as_tibble(fread("Gradient.16S.Roots.combined.trim.unique.good.filter.unique.precluster.pick.pick.opti_mcc.0.03.cons.taxonomy", sep = "\t", header = TRUE)) %>% 
+  # Rename columns
+  dplyr::rename(SIZE = Size, TAXONOMY = Taxonomy) %>% 
+  # Remove SIZE column
+  dplyr::select(-SIZE) %>% 
+  # Separate taxonomic ranks
+  tidyr::separate(TAXONOMY, c("DOMAIN", "PHYLUM", "CLASS", "ORDER", "FAMILY", "GENUS"), ";") %>% 
+  # Convert to long format
+  tidyr::gather(TAXONOMIC.RANK, TAXONOMIC.CLASSIFICATION, -OTU) %>% 
+  # Clean up taxonomy
+  dplyr::mutate(CLEAN.TAXONOMIC.CLASSIFICATION = gsub("\\(\\d.*", "", TAXONOMIC.CLASSIFICATION)) %>% 
+  # Drop old taxonomy
+  dplyr::select(-TAXONOMIC.CLASSIFICATION) %>% 
+  # Merge with OTU counts
+  dplyr::inner_join(., b.otu.tbl, by = "OTU") %>% 
+  # Convert to wide format
+  tidyr::spread(TAXONOMIC.RANK, CLEAN.TAXONOMIC.CLASSIFICATION) %>% 
+  # Group
+  dplyr::group_by(GROUP, PHYLUM, CLASS, ORDER, FAMILY) %>% 
+  # Calculate order counts
+  dplyr::summarise(COUNT = sum(COUNT)) %>% 
+  # Ungroup
+  dplyr::ungroup()
+
+# Get family table
+b.family.h.tbl <- b.family.tbl %>% 
+  # Add family ID column
+  tidyr::unite(FAMILY.ID, PHYLUM, CLASS, ORDER, FAMILY, sep = ".", remove = FALSE) %>% 
+  # Add experimental design
+  dplyr::inner_join(exp.tbl, ., by = "GROUP") %>% 
+  # Group by PLOT
+  dplyr::group_by(PLOT) %>% 
+  # Hellinger transform each OTU
+  dplyr::mutate(HELLINGER = sqrt(COUNT / sum(COUNT))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Calculate total sum
+  dplyr::mutate(TOTAL.COUNT = sum(COUNT)) %>% 
+  # Group
+  dplyr::group_by(PHYLUM, CLASS, ORDER, FAMILY) %>% 
+  # Calculate total percentage
+  dplyr::mutate(TOTAL.PERC = (100 * (sum(COUNT) * (1 / TOTAL.COUNT)))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Drop low abundance orders
+  dplyr::filter(TOTAL.PERC >= 1) %>% 
+  # Select relevant columns
+  dplyr::select(PLOT, SITE, TREATMENT, FAMILY.ID, HELLINGER) %>% 
+  # Convert to wide format
+  tidyr::spread(FAMILY.ID, HELLINGER)
+
+# Convert to data frame
+b.family.h.df <- as.data.frame(b.family.h.tbl)
+# Add row names
+row.names(b.family.h.df) <- b.family.h.df$GROUP
+# ANOVA
+b.family.h.aov <- manova(cbind(as.matrix(b.family.h.df[4 : ncol(b.family.h.df)])) ~ SITE * TREATMENT, data = b.family.h.df)
+# Get summary
+b.family.h.aov.summary <- summary.aov(b.family.h.aov)
+
+# Fisher's lsd Microbacteriaceae
+b.micr.h.lsd <- LSD.test(aov(cbind(as.matrix(b.family.h.df[6])) ~ SITE * TREATMENT, data = b.family.h.df), c("SITE", "TREATMENT"), alpha = 0.05, p.adj = "none")
+
+# Format ANOVA results
+names(b.family.h.aov.summary) <- sapply(names(b.family.h.aov.summary), clean_anova_names)
+# Collapse into tibble
+b.family.h.aov.summary.tbl <- as_tibble(do.call(rbind, b.family.h.aov.summary), rownames = "FAMILY.ID") %>% 
+  # Rename columns
+  dplyr::rename(DF = Df, 
+                SUM.SQ = "Sum Sq", 
+                MEAN.SQ = "Mean Sq", 
+                F.VAL = "F value", 
+                P.VAL = "Pr(>F)") %>% 
+  # Split the ID column
+  tidyr::separate(FAMILY.ID, c("PHYLUM", "CLASS", "ORDER", "FAMILY", "COMPARISON"), "\\.") %>% 
+  # Recreate FAMILY ID
+  tidyr::unite(FAMILY.ID, PHYLUM, CLASS, ORDER, FAMILY, sep = ".") %>% 
+  # Trim whitespace
+  dplyr::mutate(COMPARISON = trimws(COMPARISON)) %>% 
+  # Select only necessary columns
+  dplyr::select(FAMILY.ID, COMPARISON, P.VAL) %>% 
+  # Remove residuals
+  dplyr::filter(COMPARISON != "Residuals") %>% 
+  # Convert to wide format
+  tidyr::spread(COMPARISON, P.VAL) %>% 
+  # Rename columns
+  dplyr::rename(SITE.P = SITE, 
+                SITE.TREATMENT.P = 'SITE:TREATMENT', 
+                TREATMENT.P = TREATMENT)
+```
+
+### 2. Family percent change  
+
+This code calculates the percent change in the relative abundance of select bacterial families in response to experimental N deposition.  
+
+```{r bact_perc_family}
+# Get percent change family
+b.family.perc.change.tbl <- b.family.tbl %>% 
+  # Add family ID column
+  tidyr::unite(FAMILY.ID, PHYLUM, CLASS, ORDER, FAMILY, sep = ".", remove = FALSE) %>% 
+  # Add experimental design
+  dplyr::inner_join(exp.tbl, ., by = "GROUP") %>% 
+  # Group by PLOT
+  dplyr::group_by(PLOT) %>% 
+  # Calculate percentages
+  dplyr::mutate(PERC = 100 * (COUNT / sum(COUNT))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Calculate total sum
+  dplyr::mutate(TOTAL.COUNT = sum(COUNT)) %>% 
+  # Group
+  dplyr::group_by(PHYLUM, CLASS, ORDER, FAMILY) %>% 
+  # Calculate total percentage
+  dplyr::mutate(TOTAL.PERC = (100 * (sum(COUNT) * (1 / TOTAL.COUNT)))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Drop low abundance orders
+  dplyr::filter(TOTAL.PERC >= 1) %>% 
+  # Select relevant columns
+  dplyr::select(PLOT, SITE, TREATMENT, FAMILY.ID, PERC) %>% 
+  # Group
+  dplyr::group_by(FAMILY.ID, TREATMENT) %>% 
+  # Calculate mean and SE
+  dplyr::summarise(MEAN.PERC = mean(PERC), 
+                   SE.PERC = se(PERC)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Convert to long format
+  tidyr::gather(PARAMETER, PERC, -FAMILY.ID, -TREATMENT) %>% 
+  # Create new parameter column
+  tidyr::unite(PARAMETER, TREATMENT, PARAMETER, sep = "_") %>% 
+  # Convert to wide format
+  tidyr::spread(PARAMETER, PERC) %>% 
+  # Calculate percent change
+  dplyr::mutate(PERC.CHANGE = 100 * ((Ndep_MEAN.PERC - Amb_MEAN.PERC) * (1 / Amb_MEAN.PERC))) %>% 
+  # Select only orders with |% change| >= 20%
+  dplyr::filter(abs(PERC.CHANGE) >= 20) %>% 
+  # Join with ANOVA results
+  dplyr::inner_join(., b.family.h.aov.summary.tbl, by = "FAMILY.ID") %>% 
+  # Separate FAMILY.ID column
+  tidyr::separate(FAMILY.ID, c("PHYLUM", "CLASS", "ORDER", "FAMILY"), sep = "\\.") %>% 
+  # Update order column
+  dplyr::mutate(FAMILY = ifelse(FAMILY == "Saccharimonadales_fa", "Saccharimonadales\n(unclassified)", FAMILY), 
+                FAMILY = ifelse(FAMILY == "Solibacteraceae_(Subgroup_3)", "Solibacteraceae\n(Subgroup 3)", FAMILY), 
+                FAMILY = ifelse(FAMILY == "WD260_fa", "WD260\n(unclassified)", FAMILY)) %>% 
+  # Sort
+  dplyr::arrange(FAMILY) %>% 
+  # Select columns
+  dplyr::select(FAMILY, PERC.CHANGE, SITE.P, TREATMENT.P, SITE.TREATMENT.P)
+```
+
+### 3. Family bar plot
+
+This code creates the bar plots used to construct **Figure 2**.  
+
+```{r familly_bar_plot}
+# Get percent family
+b.family.perc.tbl <- b.family.tbl %>% 
+  # Add family ID column
+  tidyr::unite(FAMILY.ID, PHYLUM, CLASS, ORDER, FAMILY, sep = ".", remove = FALSE) %>% 
+  # Add experimental design
+  dplyr::inner_join(exp.tbl, ., by = "GROUP") %>% 
+  # Group by PLOT
+  dplyr::group_by(PLOT) %>% 
+  # Calculate percentages
+  dplyr::mutate(PERC = 100 * (COUNT / sum(COUNT))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Calculate total sum
+  dplyr::mutate(TOTAL.COUNT = sum(COUNT)) %>% 
+  # Group
+  dplyr::group_by(PHYLUM, CLASS, ORDER, FAMILY) %>% 
+  # Calculate total percentage
+  dplyr::mutate(TOTAL.PERC = (100 * (sum(COUNT) * (1 / TOTAL.COUNT)))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Drop low abundance orders
+  dplyr::filter(TOTAL.PERC >= 1) %>% 
+  # Select relevant columns
+  dplyr::select(PLOT, SITE, TREATMENT, FAMILY.ID, PERC) %>% 
+  # Group
+  dplyr::group_by(FAMILY.ID, TREATMENT) %>% 
+  # Calculate mean and SE
+  dplyr::summarise(MEAN.PERC = mean(PERC), 
+                   SE.PERC = se(PERC)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Convert to long format
+  tidyr::gather(PARAMETER, PERC, -FAMILY.ID, -TREATMENT) %>% 
+  # Create new parameter column
+  tidyr::unite(PARAMETER, TREATMENT, PARAMETER, sep = "_") %>% 
+  # Convert to wide format
+  tidyr::spread(PARAMETER, PERC) %>% 
+  # Calculate percent change
+  dplyr::mutate(PERC.CHANGE = 100 * ((Ndep_MEAN.PERC - Amb_MEAN.PERC) * (1 / Amb_MEAN.PERC))) %>% 
+  # Select only orders with |% change| >= 20%
+  dplyr::filter(abs(PERC.CHANGE) >= 20) %>% 
+  # Drop unnecessary columns
+  dplyr::select(-PERC.CHANGE) %>% 
+  # Convert to wide format
+  tidyr::gather(PARAMETER, PERC, -FAMILY.ID) %>% 
+  # Separate parameter column
+  tidyr::separate(PARAMETER, c("TREATMENT", "PARAMETER"), sep = "\\_") %>% 
+  # Convert to wide format
+  tidyr::spread(PARAMETER, PERC) %>% 
+  # Join with ANOVA results
+  dplyr::inner_join(., b.family.h.aov.summary.tbl, by = "FAMILY.ID") %>% 
+  # Drop non-significant taxa
+  dplyr::filter(TREATMENT.P < 0.1) %>% 
+  # Separate FAMILY.ID column
+  tidyr::separate(FAMILY.ID, c("PHYLUM", "CLASS", "ORDER", "FAMILY"), sep = "\\.") %>% 
+  # Update order column
+  dplyr::mutate(FAMILY = ifelse(FAMILY == "Saccharimonadales_fa", "Saccharimonadales\n(unclassified)", FAMILY), 
+                FAMILY = ifelse(FAMILY == "Solibacteraceae_(Subgroup_3)", "Solibacteraceae\n(Subgroup 3)", FAMILY), 
+                FAMILY = ifelse(FAMILY == "WD260_fa", "WD260\n(unclassified)", FAMILY)) %>% 
+  # Calculate error bar limits
+  dplyr::mutate(ERROR.BAR.MAX = MEAN.PERC + SE.PERC, 
+                ERROR.BAR.MIN = MEAN.PERC - SE.PERC) %>% 
+  # Add bottom error bar color
+  dplyr::mutate(ERROR.BAR.COLOR = ifelse(TREATMENT == "Amb", "black", "white")) %>% 
+  # Add significance label
+  dplyr::mutate(SIG.LABEL = ifelse(TREATMENT == "Ndep" & TREATMENT.P < 0.1 & TREATMENT.P >= 0.05, "*", ""), 
+                SIG.LABEL = ifelse(TREATMENT == "Ndep" & TREATMENT.P < 0.05, "**", SIG.LABEL))
+
+# Bacteria figure
+b.family.fig <- ggplot(b.family.perc.tbl, aes(x = FAMILY, y = MEAN.PERC, fill = TREATMENT)) + 
+  # Specify boxplot
+  geom_bar(stat = "identity", 
+           colour = "black", 
+           position = position_dodge(0.9)) + 
+  geom_errorbar(aes(ymax = MEAN.PERC, ymin = ERROR.BAR.MIN, colour = ERROR.BAR.COLOR), 
+                position = position_dodge(0.9), 
+                width = 0) + 
+  scale_color_identity() + 
+  geom_errorbar(aes(ymax = ERROR.BAR.MAX, ymin = MEAN.PERC), 
+                position = position_dodge(0.9), 
+                width = 0, 
+                colour = "black") + 
+  scale_y_continuous(expand = c(0, 0), 
+                     limits = c(0, 5),
+                     breaks = c(0, 1, 2, 3, 4, 5), 
+                     labels = c("0%", "1%", "2%", "3%", "4%", "5%")) + 
+  # Update labels on treatment/time legend
+  scale_fill_manual(values = c("white", "black"), 
+                    labels = c("  Ambient N  ", "  Experimental N")) + 
+  guides(title = NULL) + 
+  # Add x axis label
+  labs(title = "Bacterial families", 
+       x = NULL, 
+       # Add y axis label
+       y = NULL) + 
+  # Format plot
+  theme(legend.title = element_blank(), 
+        # Remove panel and legend backgrounds
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        legend.key = element_blank(), 
+        # Add axis lines
+        axis.line.x = element_line(colour = "black", size = 0.6),
+        axis.line.y = element_line(colour = "black", size = 0.6), 
+        # Format text
+        plot.title = element_text(colour = "black", size = 14, face = "bold", hjust = 0.5), 
+        axis.title.y = element_text(colour = "black", size = 14, face = "bold"), 
+        axis.text.x = element_text(colour = "black", size = 10, face = "bold", angle = 45, hjust = 1), 
+        axis.ticks.x = element_blank(), 
+        axis.ticks.y = element_line(colour = "black", size = 0.6), 
+        axis.text.y = element_text(colour = "black", size = 10, face = "bold"), 
+        legend.text = element_text(colour = "black", size = 10, face = "bold")) + 
+  geom_text(aes(label = SIG.LABEL, y = b.family.perc.tbl$MEAN.PERC + 1), 
+            stat = "identity", 
+            size = 6)
+```
+
+### 4. Supplemental figure  
+
+The following code creates the bar plots used to construct **Figure S3**.  
+
+```{r family_supp_figure}
+# Get percent order table for Microbacteriaceae
+b.family.perc.micr.tbl <- b.family.tbl %>% 
+  # Add family ID column
+  tidyr::unite(FAMILY.ID, PHYLUM, CLASS, ORDER, FAMILY, sep = ".", remove = FALSE) %>% 
+  # Replace spaces with underscores
+  dplyr::mutate(FAMILY.ID = gsub(" ", "_", FAMILY.ID)) %>% 
+  # Add experimental design
+  dplyr::inner_join(exp.tbl, ., by = "GROUP") %>% 
+  # Group by GROUP
+  dplyr::group_by(GROUP) %>% 
+  # Calculate percentages
+  dplyr::mutate(PERC = 100 * (COUNT / sum(COUNT))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Calculate total sum
+  dplyr::mutate(TOTAL.COUNT = sum(COUNT)) %>% 
+  # Group
+  dplyr::group_by(PHYLUM, CLASS, ORDER, FAMILY) %>% 
+  # Calculate total percentage
+  dplyr::mutate(TOTAL.PERC = (100 * (sum(COUNT) * (1 / TOTAL.COUNT)))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Select Microbacteriaceae
+  dplyr::filter(FAMILY == "Microbacteriaceae") %>% 
+  # Select relevant columns
+  dplyr::select(GROUP, PLOT, SITE, TREATMENT, FAMILY.ID, PERC) %>% 
+  # Group
+  dplyr::group_by(FAMILY.ID, SITE, TREATMENT) %>% 
+  # Calculate mean and SE
+  dplyr::summarise(MEAN.PERC = mean(PERC), 
+                   SE.PERC = se(PERC)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Separate FAMILY.ID column
+  tidyr::separate(FAMILY.ID, c("PHYLUM", "CLASS", "ORDER", "FAMILY"), sep = "\\.") %>% 
+  # Calculate error bar limits
+  dplyr::mutate(ERROR.BAR.MAX = MEAN.PERC + SE.PERC, 
+                ERROR.BAR.MIN = MEAN.PERC - SE.PERC) %>% 
+  # Add bottom error bar color
+  dplyr::mutate(ERROR.BAR.COLOR = ifelse(TREATMENT == "Amb", "black", "white"))
+
+# Microbacteriaceae figure
+b.micr.site.fig <- ggplot(b.family.perc.micr.tbl, aes(x = SITE, y = MEAN.PERC, fill = TREATMENT)) + 
+  # Specify boxplot
+  geom_bar(stat = "identity", 
+           colour = "black", 
+           position = position_dodge(0.9)) + 
+  geom_errorbar(aes(ymax = MEAN.PERC, ymin = ERROR.BAR.MIN, colour = ERROR.BAR.COLOR), 
+                position = position_dodge(0.9), 
+                width = 0) + 
+  scale_color_identity() + 
+  geom_errorbar(aes(ymax = ERROR.BAR.MAX, ymin = MEAN.PERC), 
+                position = position_dodge(0.9), 
+                width = 0, 
+                colour = "black") + 
+  scale_y_continuous(expand = c(0, 0), 
+                     limits = c(0, 4),
+                     breaks = c(0, 1, 2, 3, 4), 
+                     labels = c("0%", "1%", "2%", "3%", "4%")) + 
+  scale_x_discrete(breaks = waiver(), 
+                   labels = c("Site A", "Site B", "Site C", "Site D")) + 
+  # Update labels on treatment/time legend
+  scale_fill_manual(values = c("white", "black"), 
+                    labels = c("  Ambient N  ", "  Experimental N")) + 
+  guides(title = NULL) + 
+  # Add x axis label
+  labs(title = "Microbacteriaceae", 
+       x = NULL, 
+       # Add y axis label
+       y = NULL) + 
+  # Format plot
+  theme(legend.title = element_blank(), 
+        # Remove panel and legend backgrounds
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        legend.key = element_blank(), 
+        # Add axis lines
+        axis.line.x = element_line(colour = "black", size = 0.6),
+        axis.line.y = element_line(colour = "black", size = 0.6), 
+        # Format text
+        plot.title = element_text(colour = "black", size = 10, face = "bold", hjust = 0.5), 
+        axis.title.y = element_text(colour = "black", size = 14, face = "bold"), 
+        axis.text.x = element_text(colour = "black", size = 8, face = "bold", angle = 45, hjust = 1), 
+        axis.ticks.x = element_blank(), 
+        axis.ticks.y = element_line(colour = "black", size = 0.6), 
+        axis.text.y = element_text(colour = "black", size = 8, face = "bold"), 
+        legend.text = element_text(colour = "black", size = 8, face = "bold")) + 
+annotate("text", 
+         x = c(0.725, 1.225, 1.725, 2.225, 2.725, 3.225, 3.725, 4.225), 
+         y = b.family.perc.micr.tbl$ERROR.BAR.MAX + 0.4, 
+         label = c("", "", "", "**", "", "", "", ""), 
+         size = 5)
+```
+
+## D. Create final figures  
+
+### 1. Create **Figure 2**  
+
+This code constructs **Figure 2**.  
+
+```{r order_family_figure, message = FALSE, results = "hide"}
+# Create figure
+relabund.manuscript.barplot <- ggarrange(f.order.fig, b.family.fig, ncol = 1, nrow = 2, common.legend = TRUE, legend = "bottom", align = "hv")
+
+# Add y title
+relabund.manuscript.final.barplot <- annotate_figure(relabund.manuscript.barplot, 
+                                                     left = text_grob("Relative abundance\n", 
+                                                                      color = "black", 
+                                                                      rot = 90, 
+                                                                      size = 16, 
+                                                                      face = "bold", 
+                                                                      hjust = 0.17))
+
+# Save image by uncommenting the code below
+#ggsave("Figure_2.tiff", relabund.manuscript.final.barplot, device = "tiff", width = 7, height = 7.3, units = "in", dpi = 1200)
+#ggsave("Figure_2.png", relabund.manuscript.final.barplot, device = "png", width = 7, height = 7.3, units = "in", dpi = 300)
+```
+
+**Figure 2** is displayed below:  
+
+```{r display_figure2, fig.align = "center", fig.height = 7.3, fig.width = 7, echo = FALSE}
+# Display figure
+relabund.manuscript.final.barplot
+```
+
+### 2. Construct **Figure S3**   
+
+This code was used to construct **Figure S3**.
+
+```{r supp_order_family_bar_plot}
+# Combine plots into one figure
+order.family.supplemental.barplot <- ggarrange(f.hypo.site.fig, f.trem.site.fig, 
+                                               b.micr.site.fig, 
+                                               ncol = 3, nrow = 1, 
+                                               common.legend = TRUE,  
+                                               align = "hv", 
+                                               legend = "bottom")
+
+# Add y title
+order.family.supplemental.final.barplot <- annotate_figure(order.family.supplemental.barplot, 
+                                                           left = text_grob("Relative abundance\n", 
+                                                                            color = "black", 
+                                                                            rot = 90, 
+                                                                            size = 18, 
+                                                                            face = "bold", 
+                                                                            hjust = 0.38))
+
+# Save image by uncommenting the following code
+#ggsave("Figure_S3.png", order.family.supplemental.final.barplot, device = "png", width = 178, height = 100, units = "mm", dpi = 300)
+```
+
+**Figure S3** is displayed below:  
+
+```{r fig_s3, echo = FALSE, fig.align = "center", fig.width = 7, fig.height = 3.94}
+# Display figure
+order.family.supplemental.final.barplot
+```
+
+## F. Fungal multivariate statistics  
+
+The following set of code runs multivariate analyses for fungal community composition at the genus level.  
+
+### 1. PERMANOVA, PERMDISP, db-RDA  
+
+The following code runs multivariate analyses to determine the effects of experimental N deposition on the composition of fungal communities at the genus level.  
+
+```{r fungi_multi_stats, results = "hide", message = FALSE}
+# Get fungal OTU table and format it
+f.otu.tbl <- as_tibble(fread("Gradient.28S.Roots.combined.trim.unique.pick.good.filter.unique.precluster.pick.pick.opti_mcc.shared", sep = "\t", header = TRUE)) %>% 
+  # Remove unnecessary columns
+  dplyr::select(-c(label, numOtus)) %>% 
+  # Rename Group column
+  dplyr::rename(GROUP = Group) %>% 
+  # Convert to long format
+  tidyr::gather(OTU, COUNT, -GROUP)
+
+# Format fungal taxonomy and get hellinger-transformed genus counts by group
+f.genus.tbl <- as_tibble(fread("Gradient.28S.Roots.combined.trim.unique.pick.good.filter.unique.precluster.pick.pick.opti_mcc.0.01.cons.taxonomy", sep = "\t", header = TRUE)) %>% 
+  # Rename columns
+  dplyr::rename(SIZE = Size, TAXONOMY = Taxonomy) %>% 
+  # Remove SIZE column
+  dplyr::select(-SIZE) %>% 
+  # Separate taxonomic ranks
+  tidyr::separate(TAXONOMY, c("ROOT", "KINGDOM", "PHYLUM", "CLASS", "ORDER", "FAMILY", "GENUS"), ";") %>% 
+  # Convert to long format
+  tidyr::gather(TAXONOMIC.RANK, TAXONOMIC.CLASSIFICATION, -OTU) %>% 
+  # Clean up taxonomy
+  dplyr::mutate(CLEAN.TAXONOMIC.CLASSIFICATION = gsub("\\(\\d.*", "", TAXONOMIC.CLASSIFICATION)) %>% 
+  # Drop old taxonomy
+  dplyr::select(-TAXONOMIC.CLASSIFICATION) %>% 
+  # Merge with OTU counts
+  dplyr::inner_join(., f.otu.tbl, by = "OTU") %>% 
+  # Convert to wide format
+  tidyr::spread(TAXONOMIC.RANK, CLEAN.TAXONOMIC.CLASSIFICATION) %>% 
+  # Group
+  dplyr::group_by(GROUP, PHYLUM, CLASS, ORDER, FAMILY, GENUS) %>% 
+  # Calculate order counts
+  dplyr::summarise(COUNT = sum(COUNT)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Convert to wide format
+  tidyr::spread(GROUP, COUNT) %>% 
+  # Add Genus ID column
+  dplyr::mutate(GENUS.ID = paste(rep("genus", nrow(.)), c(1 : nrow(.)), sep = "_")) %>% 
+  # Remove colummns
+  dplyr::select(-PHYLUM, -CLASS, -ORDER, -FAMILY, -GENUS) %>% 
+  # Convert to long format
+  tidyr::gather(GROUP, COUNT, -GENUS.ID) %>% 
+  # Add experimental design
+  dplyr::inner_join(exp.tbl, ., by = "GROUP") %>% 
+  # Group by genus
+  dplyr::group_by(GENUS.ID) %>% 
+  # Add column of OTU totals in overall data set
+  dplyr::mutate(TOTAL.COUNT = sum(COUNT)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Group by PLOT
+  dplyr::group_by(PLOT) %>% 
+  # Hellinger transform each genus
+  dplyr::mutate(HELLINGER = sqrt(COUNT / sum(COUNT))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Remove COUNT and TOTAL.COUNT columns
+  dplyr::select(-c(COUNT, TOTAL.COUNT)) %>% 
+  # Convert to wide format
+  tidyr::spread(GENUS.ID, HELLINGER) %>% 
+  # Drop group
+  dplyr::select(-GROUP) %>% 
+  # Sort by plot
+  dplyr::arrange(PLOT)
+
+# Convert experimental design to data frame
+exp.df <- exp.tbl %>% 
+  # Filter by time
+  dplyr::select(-GROUP) %>% 
+  # Sort
+  dplyr::arrange(PLOT) %>% 
+  # Convert to data frame
+  as.data.frame(.)
+# Add row names
+row.names(exp.df) <- exp.df$PLOT
+
+# Prepare fungal OTU table for PERMANOVA
+f.genus.df <- f.genus.tbl %>% 
+  # Drop unnecessary columns
+  select(-c(SITE, TREATMENT))
+# Convert to data frame
+f.genus.df <- as.data.frame(f.genus.df)
+# Add row names
+row.names(f.genus.df) <- f.genus.df$PLOT
+# Trim the data frame
+f.genus.df <- f.genus.df[2 : ncol(f.genus.df)]
+
+# Calculate Bray-Curtis distance matrix
+f.genus.dist <- vegdist(f.genus.df, method = "bray", binary = FALSE)
+
+# Set seed
+set.seed(12345)
+# Run PERMANOVA for fungal genera
+f.genus.pma <- adonis(f.genus.dist ~ SITE * TREATMENT, data = exp.df, permutations = 9999)
+
+# Set seed
+set.seed(12345)
+
+# Run SITE dispersion test for fungi
+f.genus.site.betadisp <- betadisper(f.genus.dist, exp.df$SITE)
+# Run TREATMENT dispersion test for fungi
+f.genus.treat.betadisp <- betadisper(f.genus.dist, exp.df$TREATMENT)
+
+# Run SITE permutation test for fungi
+f.genus.site.pds <- permutest(f.genus.site.betadisp, pairwise = TRUE, permutations = 9999)
+# Run TREATMENT permutation test for fungi
+f.genus.treat.pds <- permutest(f.genus.treat.betadisp, pairwise = TRUE, permutations = 9999)
+
+# Set seed
+set.seed(12345)
+# Run dbRDA
+f.genus.dbrda <- capscale(f.genus.df ~ SITE + TREATMENT, data = exp.df, dist = "bray")
+
+# Get summary
+f.genus.dbrda.summary <- summary(f.genus.dbrda)
+```
+
+Fungal PERMANOVA results are shown below:  
+
+```{r f_pma, echo = FALSE}
+# Display results
+f.genus.pma
+```
+
+Fungal PERMDISP treatment results are shown below:  
+
+```{r f_treat_pds, echo = FALSE}
+# Display results
+f.genus.treat.pds
+```
+
+Fungal PERMDISP site results are shown below:  
+
+```{r f_site_pds, echo = FALSE}
+# Display results
+f.genus.site.pds
+```
+
+Fungal db-RDA summary is shown below:  
+
+```{r f_dbrda_summary, echo = FALSE}
+# Display results
+f.genus.dbrda.summary
+```
+
+### 2. Vector fitting  
+
+The following code fits vectors of biochemical compound classes in SOM to fungal db-RDA results  
+
+```{r fungi_som_envfit}
+# Calculate pyr.gcms.som.source.aov source abundances
+pyr.gcms.som.source.tbl <- dplyr::as_tibble(data.table::fread("pyr.gcms.data.txt", sep = "\t", header = TRUE)) %>% 
+  # Rename columns
+  dplyr::rename(COMPOUND_ID = Compound_ID, 
+                COMPOUND = Compound, 
+                TYPE = Type, 
+                SOURCE = Source) %>% 
+  # Convert to long format
+  tidyr::gather(SAMPLE.NAME, PROPORTION, -c(COMPOUND_ID, COMPOUND, TYPE, SOURCE)) %>% 
+  # Add sample information
+  dplyr::inner_join(as_tibble(fread("pyr.gc.sample.info.txt", sep = "\t", header = TRUE)), ., by = "SAMPLE.NAME") %>% 
+  # Calculate percentages
+  dplyr::mutate(PERCENTAGE = 100 * PROPORTION) %>% 
+  # Fix source names
+  dplyr::mutate(SOURCE = ifelse(SOURCE == "Lignin+TMAH", "Lignin", SOURCE), 
+                SOURCE = ifelse(SOURCE == "Phenol+TMAH", "Phenol", SOURCE), 
+                SOURCE = ifelse(SOURCE == "Unknown Origin", "Unknown", SOURCE)) %>% 
+  # Group table
+  dplyr::group_by(GROUP, SAMPLE.NAME, PLOT, SITE, TREATMENT, SUBSTRATE, SOURCE) %>% 
+  # Calculate totals
+  dplyr::summarise(PERCENTAGE = sum(PERCENTAGE)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Filter
+  dplyr::filter(SUBSTRATE == "mineral.soil") %>% 
+  dplyr::mutate(PERCENTAGE = log2(PERCENTAGE)) %>% 
+  # Wide format
+  tidyr::spread(SOURCE, PERCENTAGE) %>% 
+  # Select relevant columns
+  dplyr::select(-GROUP, -SAMPLE.NAME, -SUBSTRATE) %>% 
+  # Sort
+  dplyr::arrange(PLOT)
+
+# Convert to data frame
+pyr.gcms.som.source.df <- as.data.frame(pyr.gcms.som.source.tbl, stringsAsFactors = FALSE)
+# Trim
+pyr.gcms.som.source.exp.df <- merge(pyr.gcms.som.source.df[c(1, 4:9)], exp.df, by = "PLOT")
+# Set seed
+set.seed(12345)
+# Run envfit
+f.genus.som.envfit <- envfit(f.genus.dbrda ~ ., pyr.gcms.som.source.exp.df)
+
+# Format envfit data
+f.genus.som.envfit.tbl <- dplyr::as_tibble(rownames_to_column(as.data.frame(f.genus.som.envfit$vectors$arrows))) %>% 
+  # Add COMPOUND column
+  dplyr::rename(COMPOUND = rowname) %>% 
+  # Trim
+  dplyr::filter(COMPOUND == "Lignin" | 
+                  COMPOUND == "N-Bearing") %>% 
+  dplyr::mutate(COMPOUND = ifelse(COMPOUND == "Lignin", "bold(paste(Lig, ' **'))", COMPOUND), 
+                COMPOUND = ifelse(COMPOUND == "N-Bearing", "bold(paste(N-Bear, ' **'))", COMPOUND))
+```
+
+Vector fitting results are shown below:  
+
+```{r f_vectors, echo = FALSE}
+# Display results
+f.genus.som.envfit
+```
+
+### 3. Create db-RDA ordination  
+
+This code creates db-RDA ordination figures for **Figure 3**.  
+
+```{r fungi_dbrda}
+# Format points data for dbrda figure
+f.genus.dbrda.tbl <- dplyr::as_tibble(rownames_to_column(as.data.frame(f.genus.dbrda$CCA$wa))) %>% 
+  # Add PLOT column
+  dplyr::rename(PLOT = rowname) %>% 
+  # Add experimental design
+  dplyr::inner_join(exp.tbl, ., by = "PLOT") %>% 
+  # Drop GROUP
+  dplyr::select(-GROUP) %>% 
+  # Sort
+  dplyr::arrange(PLOT)  %>% 
+  # Convert to long format
+  tidyr::gather(CAP, LOADING, -c(PLOT, SITE, TREATMENT)) %>% 
+  # Group by variables
+  dplyr::group_by(CAP, SITE, TREATMENT) %>% 
+  # Calculate mean and se of loadings
+  dplyr::summarise(MEAN.LOADING = mean(LOADING), SE.LOADING = se(LOADING)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Add error bar limits columns
+  dplyr::mutate(EBAR.MAX = MEAN.LOADING + SE.LOADING, 
+                EBAR.MIN = MEAN.LOADING - SE.LOADING) %>% 
+  # Convert to long format
+  tidyr::gather(LOADING.PARAMETER, VALUE, -c(CAP, SITE, TREATMENT)) %>% 
+  # Add unique IDs for each CAP
+  dplyr::mutate(CAP.KEY = paste(CAP, LOADING.PARAMETER, sep = ".")) %>% 
+  # Drop unnecessary columns
+  dplyr::select(-c(CAP, LOADING.PARAMETER)) %>% 
+  # Convert to wide format
+  tidyr::spread(CAP.KEY, VALUE)
+
+# Format biplot data
+f.genus.dbrda.biplot.tbl <- dplyr::as_tibble(rownames_to_column(as.data.frame(f.genus.dbrda$CCA$biplot))) %>% 
+  # Add VARIABLE column
+  dplyr::rename(VARIABLE = rowname) %>% 
+  # Update label
+  dplyr::mutate(VARIABLE = ifelse(VARIABLE == "TREATMENTNdep", "bold(Exp~N)", VARIABLE)) %>% 
+  # Filter
+  dplyr::filter(VARIABLE == "bold(Exp~N)")
+
+# Format fungal taxonomy and get total abundance counts by genus
+f.genus.tot.tbl <- as_tibble(fread("Gradient.28S.Roots.combined.trim.unique.pick.good.filter.unique.precluster.pick.pick.opti_mcc.0.01.cons.taxonomy", sep = "\t", header = TRUE)) %>% 
+  # Rename columns
+  dplyr::rename(SIZE = Size, TAXONOMY = Taxonomy) %>% 
+  # Remove SIZE column
+  dplyr::select(-SIZE) %>% 
+  # Separate taxonomic ranks
+  tidyr::separate(TAXONOMY, c("ROOT", "KINGDOM", "PHYLUM", "CLASS", "ORDER", "FAMILY", "GENUS"), ";") %>% 
+  # Convert to long format
+  tidyr::gather(TAXONOMIC.RANK, TAXONOMIC.CLASSIFICATION, -OTU) %>% 
+  # Clean up taxonomy
+  dplyr::mutate(CLEAN.TAXONOMIC.CLASSIFICATION = gsub("\\(\\d.*", "", TAXONOMIC.CLASSIFICATION)) %>% 
+  # Drop old taxonomy
+  dplyr::select(-TAXONOMIC.CLASSIFICATION) %>% 
+  # Merge with OTU counts
+  dplyr::inner_join(., f.otu.tbl, by = "OTU") %>% 
+  # Convert to wide format
+  tidyr::spread(TAXONOMIC.RANK, CLEAN.TAXONOMIC.CLASSIFICATION) %>% 
+  # Group
+  dplyr::group_by(PHYLUM, CLASS, ORDER, FAMILY, GENUS) %>% 
+  # Calculate order counts
+  dplyr::summarise(COUNT = sum(COUNT)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Calculate percentage
+  dplyr::mutate(PERC = 100 * (COUNT * (1 / sum(COUNT)))) %>% 
+  # Add Genus ID column
+  dplyr::mutate(GENUS.ID = paste(rep("genus", nrow(.)), c(1 : nrow(.)), sep = "_"))
+
+# Format genus scores for dbrda figure
+f.genus.dbrda.scr.tbl <- dplyr::as_tibble(rownames_to_column(as.data.frame(f.genus.dbrda$CCA$v))) %>% 
+  # Add genus ID column
+  dplyr::rename(GENUS.ID = rowname) %>% 
+  # Add genus info
+  dplyr::inner_join(f.genus.tot.tbl, ., by = "GENUS.ID") %>% 
+  # Trim table
+  dplyr::filter(PERC >= 1 & GENUS != "unclassified" & GENUS != "uncultured_Thelephoraceae") %>% 
+  # Add genus label column
+  dplyr::mutate(GENUS.LABEL = c("bolditalic(Exo)", "bolditalic(Hyp)", "bolditalic(Cha)", "bolditalic(Ram)", 
+                                "bolditalic(Kue)", "bolditalic(Hem)", "bolditalic(Myc)", "bolditalic(Chr)", 
+                                "bolditalic(Umb)")) %>% 
+  # Add genus function column
+  dplyr::mutate(GENUS.FUNCTION = c("Non-Ligninolytic", "Non-Ligninolytic", "Non-Ligninolytic", "Non-Ligninolytic", 
+                                   "Ligninolytic", "Non-Ligninolytic", "Ligninolytic", "Non-Ligninolytic", 
+                                   "Non-Ligninolytic"))
+
+# Construct dbrda ordination
+f.genus.dbrda.A.fig <- ggplot() + 
+  # Add horizontal line
+  geom_hline(yintercept = 0, 
+             linetype = "dashed", 
+             size = 0.5) + 
+  # Add vertical line
+  geom_vline(xintercept = 0, 
+             linetype = "dashed", 
+             size = 0.5) + 
+  # Add dumby point
+  geom_point(aes(x = c(-0.5, 1.5), 
+                 y = c(-0.4, -0.4)),
+             alpha = 0, 
+             inherit.aes = FALSE) + 
+  # Add species scores
+  geom_point(data = f.genus.dbrda.scr.tbl, 
+             aes(x = CAP1, 
+                 y = CAP2, 
+                 size = PERC), 
+             pch = 16, 
+             alpha = 0) + 
+  # Add experimental N vector
+  geom_segment(data = f.genus.dbrda.biplot.tbl, 
+               aes(x = 0, xend = CAP1, 
+                   y = 0, yend = CAP2), 
+               size = 1,
+               arrow = arrow(length = unit(0.5, "cm")), 
+               inherit.aes = FALSE, 
+               colour = "grey50") + 
+  # Add horizontal error bars
+  geom_errorbarh(data = f.genus.dbrda.tbl, 
+                 aes(xmax = CAP1.EBAR.MAX, 
+                     xmin = CAP1.EBAR.MIN, 
+                     y = CAP2.MEAN.LOADING), 
+                 height = 0, 
+                 size = 0.75, 
+                 colour = "black", 
+                 inherit.aes = FALSE) + 
+  # Add vertical error bars
+  geom_errorbar(data = f.genus.dbrda.tbl, 
+                aes(x = CAP1.MEAN.LOADING, 
+                    ymax = CAP2.EBAR.MAX, 
+                    ymin = CAP2.EBAR.MIN), 
+                width = 0, 
+                size = 0.75, 
+                colour = "black", 
+                inherit.aes = FALSE) + 
+  # Add site by treatment centroids
+  geom_point(data = f.genus.dbrda.tbl, 
+             aes(x = CAP1.MEAN.LOADING, 
+                 y = CAP2.MEAN.LOADING, 
+                 shape = SITE, 
+                 fill = TREATMENT), 
+             size = 3, 
+             stroke = 1) + 
+  # Assign shapes by site
+  scale_shape_manual(values = c(21:24), 
+                     labels = c("Site A", "Site B", "Site C", "Site D")) + 
+  # Update labels on treatment/time legend
+  scale_fill_manual(values = c("white", "black"), 
+                    labels = c("Amb. N", "Exp. N")) + 
+  # Add title
+  labs(title = "A", 
+       # Add x axis label
+       x = "dbRDA Axis 1\n(13.0%)", 
+       # Add y axis label
+       y = "dbRDA Axis 2\n(12.1%)") + 
+  # Add correct legend shape
+   guides(fill = guide_legend(override.aes = list(shape = 21), 
+                             title = NULL, order = 1), 
+         shape = guide_legend(title = NULL, order = 2),  
+         size = FALSE, 
+         colour = FALSE) + 
+  # Update y axis ticks and labels
+  scale_y_continuous(breaks = c(-0.8, -0.4, 0, 0.4), 
+                     labels = c("-0.8", "-0.4", "0", "0.4")) + 
+  # Update x axis ticks and labels
+  scale_x_continuous(breaks = c(-1.0, 0, 1.0), 
+                     labels = c("-1.0", "0", "1.0")) + 
+  # Modify background
+  theme(aspect.ratio = 1, 
+        panel.border = element_rect(colour = "black", size = 1.5, fill = NA), 
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        legend.key = element_blank(), 
+        plot.margin = margin(0.1, 0.1, 0.1, 0.1, "cm"), 
+        # Format title and axis text
+        plot.title = element_text(colour = "black", size = 20, face = "bold", hjust = 0), 
+        axis.title.x = element_text(colour = "black", size = 14, face = "bold"), 
+        axis.title.y = element_text(colour = "black", size = 14, face = "bold"), 
+        axis.text.x = element_text(colour = "black", size = 10, face = "bold"), 
+        axis.ticks.x = element_line(colour = "black", size = 1), 
+        axis.ticks.y = element_line(colour = "black", size = 1), 
+        axis.text.y = element_text(colour = "black", size = 10, face = "bold"), 
+        # Format legend text
+        legend.text = element_text(colour = "black", size = 8, face = "bold")) + 
+  geom_text(data = f.genus.dbrda.biplot.tbl, 
+            aes(x = CAP1, y = CAP2, 
+                label = VARIABLE), 
+            hjust = -0.1, 
+            vjust = 0, 
+            inherit.aes = FALSE, 
+            parse = TRUE) + 
+  # Add SOM vectors
+  geom_segment(data = f.genus.som.envfit.tbl, 
+               aes(x = 0, xend = CAP1, 
+                   y = 0, yend = CAP2), 
+               size = 0.5, 
+               arrow = arrow(length = unit(0.5, "cm")), 
+               inherit.aes = FALSE, 
+               alpha = 0) + 
+  geom_text(data = f.genus.som.envfit.tbl, 
+            aes(x = CAP1, y = CAP2, 
+                label = COMPOUND), 
+            hjust = -0.1, 
+            vjust = 0, 
+            inherit.aes = FALSE, 
+            alpha = 0, 
+            parse = TRUE)
+
+# Construct dbrda ordination
+f.genus.dbrda.B.fig <- ggplot() + 
+  # Add horizontal line
+  geom_hline(yintercept = 0, 
+             linetype = "dashed", 
+             size = 0.5) + 
+  # Add vertical line
+  geom_vline(xintercept = 0, 
+             linetype = "dashed", 
+             size = 0.5) + 
+  # Add dumby point
+  geom_point(aes(x = c(-0.5, 1.5), 
+                 y = c(-0.4, -0.4)),
+             alpha = 0, 
+             inherit.aes = FALSE) + 
+  # Add experimental N vector
+  geom_segment(data = f.genus.dbrda.biplot.tbl, 
+               aes(x = 0, xend = CAP1, 
+                   y = 0, yend = CAP2), 
+               size = 1,
+               arrow = arrow(length = unit(0.5, "cm")), 
+               inherit.aes = FALSE, 
+               colour = "grey50") + 
+  # Add SOM vectors
+  geom_segment(data = f.genus.som.envfit.tbl, 
+               aes(x = 0, xend = CAP1, 
+                   y = 0, yend = CAP2), 
+               size = 1, 
+               arrow = arrow(length = unit(0.5, "cm")), 
+               inherit.aes = FALSE, 
+               colour = "grey50") + 
+  # Add species scores
+  geom_point(data = f.genus.dbrda.scr.tbl, 
+             aes(x = CAP1, 
+                 y = CAP2, 
+                 colour = GENUS.FUNCTION, 
+                 size = PERC), 
+             pch = 16) + 
+  # Add labels
+  geom_text_repel(data = f.genus.dbrda.scr.tbl, 
+                  aes(x = CAP1, 
+                      y = CAP2, 
+                      label = GENUS.LABEL), 
+                  hjust = 0, 
+                  vjust = 0, 
+                  parse = TRUE) + 
+  # Add horizontal error bars
+  geom_errorbarh(data = f.genus.dbrda.tbl, 
+                 aes(xmax = CAP1.EBAR.MAX, 
+                     xmin = CAP1.EBAR.MIN, 
+                     y = CAP2.MEAN.LOADING), 
+                 height = 0, 
+                 size = 0.5, 
+                 colour = "black", 
+                 inherit.aes = FALSE, 
+                 alpha = 0) + 
+  # Add vertical error bars
+  geom_errorbar(data = f.genus.dbrda.tbl, 
+                aes(x = CAP1.MEAN.LOADING, 
+                    ymax = CAP2.EBAR.MAX, 
+                    ymin = CAP2.EBAR.MIN), 
+                width = 0, 
+                size = 1, 
+                colour = "black", 
+                inherit.aes = FALSE, 
+                alpha = 0) + 
+  # Add site by treatment centroids
+  geom_point(data = f.genus.dbrda.tbl, 
+             aes(x = CAP1.MEAN.LOADING, 
+                 y = CAP2.MEAN.LOADING, 
+                 shape = SITE, 
+                 fill = TREATMENT), 
+             size = 3, 
+             stroke = 1, 
+             alpha = 0) + 
+  # Update color
+  scale_colour_manual(values = c("green3", "sienna"), 
+                      labels = c("Ligninolytic", 
+                                 "Non-\nLigninolytic")) + 
+  # Abundance
+  scale_size_continuous(breaks = c(5, 10, 15, 20), 
+                        labels = c("5%", "10%", "15%", "20%")) + 
+  # Add title
+  labs(title = "B", 
+       # Add x axis label
+       x = "db-RDA Axis 1\n(13.0%)", 
+       # Add y axis label
+       y = "db-RDA Axis 2\n(12.1%)") + 
+  # Add correct legend shape
+  guides(fill = FALSE, 
+         shape = FALSE, 
+         size = guide_legend(title = NULL, order = 4), 
+         colour = guide_legend(title = NULL, order = 3)) + 
+  # Update y axis ticks and labels
+  scale_y_continuous(breaks = c(-0.8, -0.4, 0, 0.4), 
+                     labels = c("-0.8", "-0.4", "0", "0.4")) + 
+  # Update x axis ticks and labels
+  scale_x_continuous(breaks = c(0, 1.0), 
+                     labels = c("0", "1.0")) + 
+  # Modify background
+  theme(aspect.ratio = 1, 
+        panel.border = element_rect(colour = "black", size = 1.5, fill = NA), 
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        legend.key = element_blank(), 
+        legend.background = element_blank(), 
+        plot.margin = margin(0.1, 0.1, 0.1, 0.1, "cm"), 
+        # Format title and axis text
+        plot.title = element_text(colour = "black", size = 20, face = "bold", hjust = 0), 
+        axis.title.x = element_text(colour = "black", size = 14, face = "bold"), 
+        axis.title.y = element_text(colour = "black", size = 14, face = "bold"), 
+        axis.text.x = element_text(colour = "black", size = 10, face = "bold"), 
+        axis.ticks.x = element_line(colour = "black", size = 1), 
+        axis.ticks.y = element_line(colour = "black", size = 1), 
+        axis.text.y = element_text(colour = "black", size = 10, face = "bold"), 
+        # Format legend text
+        legend.text = element_text(colour = "black", size = 8, face = "bold")) + 
+  # Vector label
+  geom_text(data = f.genus.dbrda.biplot.tbl, 
+            aes(x = CAP1, y = CAP2, 
+                label = VARIABLE), 
+            hjust = -0.1, 
+            vjust = 0, 
+            inherit.aes = FALSE, 
+            parse = TRUE) + 
+  # Add SOM labels
+  geom_text(data = f.genus.som.envfit.tbl, 
+            aes(x = CAP1, y = CAP2, 
+                label = COMPOUND), 
+            hjust = -0.1, 
+            vjust = 0, 
+            inherit.aes = FALSE, 
+            parse = TRUE)
+```
+
+## G. Bacterial multivariate analyses  
+
+The following set of code runs multivariate analyses for bacterial community composition at the family level.  
+
+### 1. PERMANOVA, PERMDISP, db-RDA  
+
+The following code runs multivariate analyses to determine the effects of experimental N deposition on the composition of bacterial communities at the family level.  
+
+```{r bacterial_families_multivariate_analyses, message = FALSE, results = "hide"}
+# Get bacterial OTU table and format it
+b.otu.tbl <- as_tibble(fread("Gradient.16S.Roots.combined.trim.unique.good.filter.unique.precluster.pick.pick.opti_mcc.shared", sep = "\t", header = TRUE)) %>% 
+  # Remove unnecessary columns
+  dplyr::select(-c(label, numOtus)) %>% 
+  # Rename Group column
+  dplyr::rename(GROUP = Group) %>% 
+  # Convert to long format
+  tidyr::gather(OTU, COUNT, -GROUP)
+
+# Format bacterial taxonomy and get Family counts by group
+b.family.tbl <- as_tibble(fread("Gradient.16S.Roots.combined.trim.unique.good.filter.unique.precluster.pick.pick.opti_mcc.0.03.cons.taxonomy", sep = "\t", header = TRUE)) %>% 
+  # Rename columns
+  dplyr::rename(SIZE = Size, TAXONOMY = Taxonomy) %>% 
+  # Remove SIZE column
+  dplyr::select(-SIZE) %>% 
+  # Separate taxonomic ranks
+  tidyr::separate(TAXONOMY, c("DOMAIN", "PHYLUM", "CLASS", "ORDER", "FAMILY", "GENUS"), ";") %>% 
+  # Convert to long format
+  tidyr::gather(TAXONOMIC.RANK, TAXONOMIC.CLASSIFICATION, -OTU) %>% 
+  # Clean up taxonomy
+  dplyr::mutate(CLEAN.TAXONOMIC.CLASSIFICATION = gsub("\\(\\d.*", "", TAXONOMIC.CLASSIFICATION)) %>% 
+  # Drop old taxonomy
+  dplyr::select(-TAXONOMIC.CLASSIFICATION) %>% 
+  # Merge with OTU counts
+  dplyr::inner_join(., b.otu.tbl, by = "OTU") %>% 
+  # Convert to wide format
+  tidyr::spread(TAXONOMIC.RANK, CLEAN.TAXONOMIC.CLASSIFICATION) %>% 
+  # Group
+  dplyr::group_by(GROUP, PHYLUM, CLASS, ORDER, FAMILY) %>% 
+  # Calculate family counts
+  dplyr::summarise(COUNT = sum(COUNT)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Convert to wide format
+  tidyr::spread(GROUP, COUNT) %>% 
+  # Add family ID column
+  dplyr::mutate(FAMILY.ID = paste(rep("family", nrow(.)), c(1 : nrow(.)), sep = "_")) %>% 
+  # Remove colummns
+  dplyr::select(-PHYLUM, -CLASS, -ORDER, -FAMILY) %>% 
+  # Convert to long format
+  tidyr::gather(GROUP, COUNT, -FAMILY.ID) %>% 
+  # Add experimental design
+  dplyr::inner_join(exp.tbl, ., by = "GROUP") %>% 
+  # Group by family
+  dplyr::group_by(FAMILY.ID) %>% 
+  # Add column of family totals in overall data set
+  dplyr::mutate(TOTAL.COUNT = sum(COUNT)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Group by PLOT
+  dplyr::group_by(PLOT) %>% 
+  # Hellinger transform each family
+  dplyr::mutate(HELLINGER = sqrt(COUNT / sum(COUNT))) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Remove COUNT and TOTAL.COUNT columns
+  dplyr::select(-c(COUNT, TOTAL.COUNT)) %>% 
+  # Convert to wide format
+  tidyr::spread(FAMILY.ID, HELLINGER) %>% 
+  # Drop group
+  dplyr::select(-GROUP) %>% 
+  # Sort by plot
+  dplyr::arrange(PLOT)
+
+# Prepare bacterial family table for PERMANOVA
+b.family.df <- b.family.tbl %>% 
+  # Drop unnecessary columns
+  select(-c(SITE, TREATMENT))
+# Convert to data frame
+b.family.df <- as.data.frame(b.family.df)
+# Add row names
+row.names(b.family.df) <- b.family.df$PLOT
+# Trim the data frame
+b.family.df <- b.family.df[2 : ncol(b.family.df)]
+
+# Calculate Bray-Curtis distance matrix
+b.family.dist <- vegdist(b.family.df, method = "bray", binary = FALSE)
+
+# Set seed
+set.seed(12345)
+# Run PERMANOVA for bacterial families
+b.family.pma <- adonis(b.family.dist ~ SITE * TREATMENT, data = exp.df, permutations = 9999)
+
+# Set seed
+set.seed(12345)
+
+# Run SITE dispersion test for bacteria
+b.family.site.betadisp <- betadisper(b.family.dist, exp.df$SITE)
+# Run TREATMENT dispersion test for bacteria
+b.family.treat.betadisp <- betadisper(b.family.dist, exp.df$TREATMENT)
+
+# Run SITE permutation test for bacteria
+b.family.site.pds <- permutest(b.family.site.betadisp, pairwise = TRUE, permutations = 9999)
+# Run TREATMENT permutation test for bacteria
+b.family.treat.pds <- permutest(b.family.treat.betadisp, pairwise = TRUE, permutations = 9999)
+
+# Set seed
+set.seed(12345)
+
+# Run dbRDA
+b.family.dbrda <- capscale(b.family.df ~ SITE + TREATMENT, data = exp.df, dist = "bray")
+
+# Get summary
+b.family.dbrda.summary <- summary(b.family.dbrda)
+```
+
+Bacterial PERMANOVA results are shown below:  
+
+```{r b_pma, echo = FALSE}
+# Display results
+b.family.pma
+```
+
+Bacterial PERMDISP treatment results are shown below:  
+
+```{r b_treat_pds, echo = FALSE}
+# Display results
+b.family.treat.pds
+```
+
+Bacterial PERMDISP site results are shown below:  
+
+```{r b_site_pds, echo = FALSE}
+# Display results
+b.family.site.pds
+```
+
+Bacterial db-RDA summary is shown below:  
+
+```{r b_dbrda_summary, echo = FALSE}
+# Display results
+b.family.dbrda.summary
+```
+
+### 2. Vector fitting  
+
+The following code fits vectors of biochemical compound classes in SOM to bacterial db-RDA results  
+
+```{r bacteria_envfit}
+# Set seed
+set.seed(12345)
+
+# Run envfit
+b.family.som.envfit <- envfit(b.family.dbrda ~ ., pyr.gcms.som.source.exp.df)
+
+# Format envfit data
+b.family.som.envfit.tbl <- dplyr::as_tibble(rownames_to_column(as.data.frame(b.family.som.envfit$vectors$arrows))) %>% 
+  # Add COMPOUND column
+  dplyr::rename(COMPOUND = rowname) %>% 
+  # Trim
+  dplyr::filter(COMPOUND == "Lignin" | 
+                  COMPOUND == "Lipid") %>% 
+  dplyr::mutate(COMPOUND = ifelse(COMPOUND == "Lignin", "bold(paste(Lig, ' **'))", COMPOUND), 
+                COMPOUND = ifelse(COMPOUND == "Lipid", "bold(paste(Lip, ' *'))", COMPOUND))
+```
+
+Bacterial vector fitting results are as follows:  
+
+```{r b_envfit_summary, echo = FALSE}
+# Display results
+b.family.som.envfit
+```
+
+### 3. Create db-RDA ordinations  
+
+This code creates db-RDA ordinations for bacterial composition at the family level that were used to create **Figure 3**.  
+
+```{r bacterial_family_dbrda, results = "hide", message = FALSE}
+# Format points data for dbrda figure
+b.family.dbrda.tbl <- dplyr::as_tibble(rownames_to_column(as.data.frame(b.family.dbrda$CCA$wa))) %>% 
+  # Add PLOT column
+  dplyr::rename(PLOT = rowname) %>% 
+  # Add experimental design
+  dplyr::inner_join(exp.tbl, ., by = "PLOT") %>% 
+  # Drop GROUP
+  dplyr::select(-GROUP) %>% 
+  # Sort
+  dplyr::arrange(PLOT)  %>% 
+  # Convert to long format
+  tidyr::gather(CAP, LOADING, -c(PLOT, SITE, TREATMENT)) %>% 
+  # Group by variables
+  dplyr::group_by(CAP, SITE, TREATMENT) %>% 
+  # Calculate mean and se of loadings
+  dplyr::summarise(MEAN.LOADING = mean(LOADING), SE.LOADING = se(LOADING)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Add error bar limits columns
+  dplyr::mutate(EBAR.MAX = MEAN.LOADING + SE.LOADING, 
+                EBAR.MIN = MEAN.LOADING - SE.LOADING) %>% 
+  # Convert to long format
+  tidyr::gather(LOADING.PARAMETER, VALUE, -c(CAP, SITE, TREATMENT)) %>% 
+  # Add unique IDs for each CAP
+  dplyr::mutate(CAP.KEY = paste(CAP, LOADING.PARAMETER, sep = ".")) %>% 
+  # Drop unnecessary columns
+  dplyr::select(-c(CAP, LOADING.PARAMETER)) %>% 
+  # Convert to wide format
+  tidyr::spread(CAP.KEY, VALUE)
+
+# Format biplot data
+b.family.dbrda.biplot.tbl <- dplyr::as_tibble(rownames_to_column(as.data.frame(b.family.dbrda$CCA$biplot))) %>% 
+  # Add VARIABLE column
+  dplyr::rename(VARIABLE = rowname) %>% 
+  # Update label
+  dplyr::mutate(VARIABLE = ifelse(VARIABLE == "TREATMENTNdep", "bold(Exp~N)", VARIABLE)) %>% 
+  # Filter
+  dplyr::filter(VARIABLE == "bold(Exp~N)")
+
+# Format bacterial taxonomy and get total abundance counts by family
+b.family.tot.tbl <- as_tibble(fread("Gradient.16S.Roots.combined.trim.unique.good.filter.unique.precluster.pick.pick.opti_mcc.0.03.cons.taxonomy", sep = "\t", header = TRUE)) %>% 
+  # Rename columns
+  dplyr::rename(SIZE = Size, TAXONOMY = Taxonomy) %>% 
+  # Remove SIZE column
+  dplyr::select(-SIZE) %>% 
+  # Separate taxonomic ranks
+  tidyr::separate(TAXONOMY, c("DOMAIN", "PHYLUM", "CLASS", "ORDER", "FAMILY", "GENUS"), ";") %>% 
+  # Convert to long format
+  tidyr::gather(TAXONOMIC.RANK, TAXONOMIC.CLASSIFICATION, -OTU) %>% 
+  # Clean up taxonomy
+  dplyr::mutate(CLEAN.TAXONOMIC.CLASSIFICATION = gsub("\\(\\d.*", "", TAXONOMIC.CLASSIFICATION)) %>% 
+  # Drop old taxonomy
+  dplyr::select(-TAXONOMIC.CLASSIFICATION) %>% 
+  # Merge with OTU counts
+  dplyr::inner_join(., b.otu.tbl, by = "OTU") %>% 
+  # Convert to wide format
+  tidyr::spread(TAXONOMIC.RANK, CLEAN.TAXONOMIC.CLASSIFICATION) %>% 
+  # Group
+  dplyr::group_by(PHYLUM, CLASS, ORDER, FAMILY) %>% 
+  # Calculate family counts
+  dplyr::summarise(COUNT = sum(COUNT)) %>% 
+  # Ungroup
+  dplyr::ungroup() %>% 
+  # Calculate percentage
+  dplyr::mutate(PERC = 100 * (COUNT * (1 / sum(COUNT)))) %>% 
+  # Add family ID column
+  dplyr::mutate(FAMILY.ID = paste(rep("family", nrow(.)), c(1 : nrow(.)), sep = "_"))
+
+# Format family scores for dbrda figure
+b.family.dbrda.scr.tbl <- dplyr::as_tibble(rownames_to_column(as.data.frame(b.family.dbrda$CCA$v))) %>% 
+  # Add family ID column
+  dplyr::rename(FAMILY.ID = rowname) %>% 
+  # Add genus info
+  dplyr::inner_join(b.family.tot.tbl, ., by = "FAMILY.ID") %>% 
+  dplyr::filter(PERC >= 1 & FAMILY != "Unknown_Family" & 
+                  FAMILY != "Gammaproteobacteria_unclassified" & 
+                  FAMILY != "Gammaproteobacteria_unclassified" & 
+                  FAMILY != "WD260_fa" & 
+                  FAMILY != "Saccharimonadales_fa" & 
+                  FAMILY != "Caulobacteraceae_unclassified") %>% 
+  # Add family label column
+  dplyr::mutate(FAMILY.LABEL = c("bold(Aci)", "bold(Sol)", "bold(Mib)", "bold('Chi')", "bold(Spb)", 
+                                 "bold(Gem)", "bold(Ace)", 
+                                 "bold(Cau)", "bold(Mip)", "bold(Xan)", "bold(Spg)", "bold(Bur)", "bold('Rho')")) %>% 
+  # Add family function column
+  dplyr::mutate(FAMILY.FUNCTION = c("Non-Ligninolytic", "Ligninolytic", "Ligninolytic", 
+                                    "Non-Ligninolytic", "Ligninolytic", "Non-Ligninolytic", 
+                                    "Non-Ligninolytic", "Ligninolytic", "Non-Ligninolytic", 
+                                    "Non-Ligninolytic", "Ligninolytic", "Ligninolytic", 
+                                    "Ligninolytic"))
+
+# Construct dbrda ordination
+b.family.dbrda.C.fig <- ggplot() + 
+  # Add horizontal line
+  geom_hline(yintercept = 0, 
+             linetype = "dashed", 
+             size = 0.5) + 
+  # Add vertical line
+  geom_vline(xintercept = 0, 
+             linetype = "dashed", 
+             size = 0.5) + 
+  # Add dumby point
+  geom_point(aes(x = c(-0.5, 0.6), 
+                 y = c(-1, 1)),
+             alpha = 0, 
+             inherit.aes = FALSE) + 
+  # Add SOM vectors
+  geom_segment(data = b.family.som.envfit.tbl, 
+               aes(x = 0, xend = CAP1, 
+                   y = 0, yend = CAP2), 
+               size = 1, 
+               arrow = arrow(length = unit(0.5, "cm")), 
+               inherit.aes = FALSE, 
+               alpha = 0) + 
+  # Add experimental N vector
+  geom_segment(data = b.family.dbrda.biplot.tbl, 
+               aes(x = 0, xend = CAP1, 
+                   y = 0, yend = CAP2), 
+               size = 1,
+               arrow = arrow(length = unit(0.5, "cm")), 
+               inherit.aes = FALSE, 
+               colour = "grey50") + 
+  # Add species scores
+  geom_point(data = b.family.dbrda.scr.tbl, 
+             aes(x = CAP1, 
+                 y = CAP2, 
+                 size = PERC), 
+             pch = 16, 
+             alpha = 0) + 
+  # Add horizontal error bars
+  geom_errorbarh(data = b.family.dbrda.tbl, 
+                 aes(xmax = CAP1.EBAR.MAX, 
+                     xmin = CAP1.EBAR.MIN, 
+                     y = CAP2.MEAN.LOADING), 
+                 height = 0, 
+                 size = 0.75, 
+                 colour = "black", 
+                 inherit.aes = FALSE) + 
+  # Add vertical error bars
+  geom_errorbar(data = b.family.dbrda.tbl, 
+                aes(x = CAP1.MEAN.LOADING, 
+                    ymax = CAP2.EBAR.MAX, 
+                    ymin = CAP2.EBAR.MIN), 
+                width = 0, 
+                size = 0.75, 
+                colour = "black", 
+                inherit.aes = FALSE) + 
+  # Add site by treatment centroids
+  geom_point(data = b.family.dbrda.tbl, 
+             aes(x = CAP1.MEAN.LOADING, 
+                 y = CAP2.MEAN.LOADING, 
+                 shape = SITE, 
+                 fill = TREATMENT), 
+             size = 3, 
+             stroke = 1) + 
+  # Assign shapes by site
+  scale_shape_manual(values = c(21:24), 
+                     labels = c("A", "B", "C", "D")) + 
+  # Update labels on treatment/time legend
+  scale_fill_manual(values = c("white", "black"), 
+                    labels = c("Amb.", "Exp.")) + 
+  # Add title
+  labs(title = "C", 
+       # Add x axis label
+       x = "db-RDA Axis 1\n(16.1%)", 
+       # Add y axis label
+       y = "db-RDA Axis 2\n(8.7%)") + 
+  # Add correct legend shape
+   guides(fill = guide_legend(override.aes = list(shape = 21), 
+                             title = NULL, order = 1), 
+         shape = guide_legend(title = NULL, order = 2),  
+         size = FALSE, 
+         colour = FALSE) + 
+  # Update y axis ticks and labels
+  scale_y_continuous(breaks = c(-1, -0.5, 0, 0.5, 1.0), 
+                     labels = c("-1.0", "-0.5", "0", "0.5", "1.0")) + 
+  # Update x axis ticks and labels
+  scale_x_continuous(breaks = c(-0.4, 0, 0.4), 
+                     labels = c("-0.4", "0", "0.4")) + 
+  # Modify background
+  theme(aspect.ratio = 1, 
+        panel.border = element_rect(colour = "black", size = 1.5, fill = NA), 
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        legend.key = element_blank(), 
+        plot.margin = margin(0.1, 0.1, 0.1, 0.1, "cm"), 
+        # Format title and axis text
+        plot.title = element_text(colour = "black", size = 20, face = "bold", hjust = 0), 
+        axis.title.x = element_text(colour = "black", size = 14, face = "bold"), 
+        axis.title.y = element_text(colour = "black", size = 14, face = "bold"), 
+        axis.text.x = element_text(colour = "black", size = 10, face = "bold"), 
+        axis.ticks.x = element_line(colour = "black", size = 1), 
+        axis.ticks.y = element_line(colour = "black", size = 1), 
+        axis.text.y = element_text(colour = "black", size = 10, face = "bold"), 
+        # Format legend text
+        legend.text = element_text(colour = "black", size = 8, face = "bold")) + 
+  # Add experimental N vector
+  geom_text(data = b.family.dbrda.biplot.tbl, 
+            aes(x = CAP1, y = CAP2, 
+                label = VARIABLE), 
+            hjust = -0.1, 
+            vjust = 0, 
+            inherit.aes = FALSE, 
+            parse = TRUE) + 
+  geom_text(data = b.family.som.envfit.tbl, 
+            aes(x = CAP1, y = CAP2, 
+                label = COMPOUND), 
+            hjust = -0.1, 
+            vjust = 0, 
+            inherit.aes = FALSE, 
+            alpha = 0) + 
+  # Add SOM vectors
+  geom_segment(data = b.family.som.envfit.tbl, 
+               aes(x = 0, xend = CAP1, 
+                   y = 0, yend = CAP2), 
+               size = 0.5, 
+               arrow = arrow(length = unit(0.5, "cm")), 
+               inherit.aes = FALSE, 
+               alpha = 0) + 
+  geom_text(data = b.family.som.envfit.tbl, 
+            aes(x = CAP1, y = CAP2, 
+                label = COMPOUND), 
+            hjust = 1.1, 
+            vjust = 0, 
+            inherit.aes = FALSE, 
+            alpha = 0, 
+            parse = TRUE)
+
+# Construct dbrda ordination
+b.family.dbrda.D.fig <- ggplot() + 
+  # Add horizontal line
+  geom_hline(yintercept = 0, 
+             linetype = "dashed", 
+             size = 0.5) + 
+  # Add vertical line
+  geom_vline(xintercept = 0, 
+             linetype = "dashed", 
+             size = 0.5) + 
+   # Add SOM vectors
+  geom_segment(data = b.family.som.envfit.tbl, 
+               aes(x = 0, xend = CAP1, 
+                   y = 0, yend = CAP2), 
+               size = 1, 
+               arrow = arrow(length = unit(0.5, "cm")), 
+               inherit.aes = FALSE, 
+               colour = "grey50") + 
+  # Add experimental N vector
+  geom_segment(data = b.family.dbrda.biplot.tbl, 
+               aes(x = 0, xend = CAP1, 
+                   y = 0, yend = CAP2), 
+               size = 1,
+               arrow = arrow(length = unit(0.5, "cm")), 
+               inherit.aes = FALSE, 
+               colour = "grey50") + 
+  # Add dumby points
+  geom_point(aes(x = c(-0.5, 0.6), 
+                 y = c(-1, 1)),
+             alpha = 0, 
+             inherit.aes = FALSE) + 
+  # Add species scores
+  geom_point(data = b.family.dbrda.scr.tbl, 
+             aes(x = CAP1, 
+                 y = CAP2, 
+                 colour = FAMILY.FUNCTION, 
+                 size = PERC), 
+             pch = 16) + 
+  # Add labels
+  geom_text_repel(data = b.family.dbrda.scr.tbl, 
+                  aes(x = CAP1, 
+                      y = CAP2, 
+                      label = FAMILY.LABEL), 
+                  hjust = 0, 
+                  vjust = 0, 
+                  parse = TRUE, 
+                  nudge_x = -0.12) + 
+  # Add horizontal error bars
+  geom_errorbarh(data = b.family.dbrda.tbl, 
+                 aes(xmax = CAP1.EBAR.MAX, 
+                     xmin = CAP1.EBAR.MIN, 
+                     y = CAP2.MEAN.LOADING), 
+                 height = 0, 
+                 size = 0.75, 
+                 colour = "black", 
+                 inherit.aes = FALSE, 
+                 alpha = 0) + 
+  # Add vertical error bars
+  geom_errorbar(data = b.family.dbrda.tbl, 
+                aes(x = CAP1.MEAN.LOADING, 
+                    ymax = CAP2.EBAR.MAX, 
+                    ymin = CAP2.EBAR.MIN), 
+                width = 0, 
+                size = 0.75, 
+                colour = "black", 
+                inherit.aes = FALSE, 
+                alpha = 0) + 
+  # Add site by treatment centroids
+  geom_point(data = b.family.dbrda.tbl, 
+             aes(x = CAP1.MEAN.LOADING, 
+                 y = CAP2.MEAN.LOADING, 
+                 shape = SITE, 
+                 fill = TREATMENT), 
+             size = 3, 
+             stroke = 1, 
+             alpha = 0) + 
+  # Update color
+  scale_colour_manual(values = c( "green3", "sienna"), 
+                      labels = c("Ligninolytic", 
+                                 "Non-\nLigninolytic")) + 
+  # Abundance
+  scale_size_continuous(breaks = c(5, 10, 15), 
+                        labels = c("5%", "10%", "15%")) + 
+  # Add title
+  labs(title = "D", 
+       # Add x axis label
+       x = "db-RDA Axis 1\n(16.1%)", 
+       # Add y axis label
+       y = "db-RDA Axis 2\n(8.7%)") + 
+  # Add correct legend shape
+  guides(fill = FALSE, 
+         shape = FALSE, 
+         size = guide_legend(title = NULL, order = 4), 
+         colour = guide_legend(title = NULL, order = 3)) + 
+  # Update y axis ticks and labels
+  scale_y_continuous(breaks = c(-1, -0.5, 0, 0.5, 1.0), 
+                     labels = c("-1.0", "-0.5", "0", "0.5", "1.0")) + 
+  # Update x axis ticks and labels
+  scale_x_continuous(breaks = c(-0.4, 0, 0.4), 
+                     labels = c("-0.4", "0", "0.4")) + 
+  # Modify background
+  theme(aspect.ratio = 1, 
+        panel.border = element_rect(colour = "black", size = 1.5, fill = NA), 
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        legend.key = element_blank(), 
+        plot.margin = margin(0.1, 0.1, 0.1, 0.1, "cm"), 
+        # Format title and axis text
+        plot.title = element_text(colour = "black", size = 20, face = "bold", hjust = 0), 
+        axis.title.x = element_text(colour = "black", size = 14, face = "bold"), 
+        axis.title.y = element_text(colour = "black", size = 14, face = "bold"), 
+        axis.text.x = element_text(colour = "black", size = 10, face = "bold"), 
+        axis.ticks.x = element_line(colour = "black", size = 1), 
+        axis.ticks.y = element_line(colour = "black", size = 1), 
+        axis.text.y = element_text(colour = "black", size = 10, face = "bold"), 
+        # Format legend text
+        legend.text = element_text(colour = "black", size = 8, face = "bold")) + 
+  geom_text(data = b.family.dbrda.biplot.tbl, 
+            aes(x = CAP1, y = CAP2, 
+                label = VARIABLE), 
+            hjust = -0.1, 
+            vjust = 0, 
+            inherit.aes = FALSE, 
+            parse = TRUE) + 
+  geom_text(data = b.family.som.envfit.tbl, 
+            aes(x = CAP1, y = CAP2, 
+                label = COMPOUND), 
+            hjust = 1.1, 
+            vjust = 0, 
+            inherit.aes = FALSE, 
+            parse = TRUE)
+```
+
+## H. Create **Figure 3**  
+
+```{r create_fig_3}
+# Create dbRDA figure
+manuscript.dbrda.fig <- ggarrange(f.genus.dbrda.A.fig, f.genus.dbrda.B.fig, 
+                                  b.family.dbrda.C.fig, b.family.dbrda.D.fig,  
+                                  ncol = 2, nrow = 2, 
+                                  common.legend = FALSE,  
+                                  align = "v")
+
+# Save figure by uncommenting the following code
+ggsave("Figure_3.tiff", manuscript.dbrda.fig, device = "tiff", width = 10.25, height = 10.25, units = "in", dpi = 1200)
+ggsave("Figure_3.png", manuscript.dbrda.fig, device = "png", width = 10.25, height = 10.25, units = "in", dpi = 300)
+```
+
+**Figure 3** is shown below:  
+
+```{r fig_3, echo = FALSE, fig.width = 10.25, fig.height = 10.25}
+# Display figure
+manuscript.dbrda.fig
+```
